@@ -1,0 +1,10 @@
+node_modules/
+coverage/
+.env
+database.sqlite
+/test-results/
+/playwright-report/
+/playwright-screenshots/
+/blob-report/
+/playwright/.cache/
+.DS_Store
