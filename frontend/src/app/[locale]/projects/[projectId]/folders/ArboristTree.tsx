@@ -148,33 +148,49 @@ export default function ArboristTree({
 
   // --- Перезагрузка папки после создания ---
   const reloadFolder = async (folderId: number) => {
-    let folder = allFolders.find((f) => f.id === folderId);
 
-    if (!folder) {
-      // Если папки нет в allFolders, перезагружаем все папки
-      const fetchedFolders = await fetchFolders(ctx.token.access_token, Number(projectId));
-      setAllFolders(fetchedFolders);
-      folder = fetchedFolders.find((f: FolderType) => f.id === folderId);
-      if (!folder) return;
-    }
+    const subFolders = allFolders.filter((f) => f.parentFolderId === folderId);
+    const fetchedCases = await fetchCases(ctx.token.access_token, Number(folderId));
 
-    // Принудительно перезагрузить содержимое папки
-    const folderNode: NodeData = {
-      id: `folder-${folderId}`,
-      name: folder.name,
-      folderId: folderId,
-      parentFolderId: folder.parentFolderId,
-      children: [],
-      loaded: false,
-    };
+    const newChildren: NodeData[] = [
+      ...subFolders.map((f) => ({
+        id: `folder-${f.id}`,
+        name: f.name,
+        children: [],
+        folderId: f.id,
+        parentFolderId: f.parentFolderId,
+        loaded: false,
+        checked: false,
+        indeterminate: false,
+        open: false,
+      })),
 
-    await loadFolder(folderNode);
+      ...fetchedCases.map((c: CaseType) => ({
+        id: `case-${c.id}`,
+        name: c.title,
+        isCase: true,
+        caseData: c,
+        folderId: folderId,
+        children: [],
+        loaded: true,
+      })),
 
-    // Обновить дерево
+      // Добавляем создающий узел в конец
+      {
+        id: `create-${folderId}`,
+        name: 'New Folder',
+        isCreateNode: true,
+        createParentId: folderId,
+        children: [],
+        loaded: true,
+      },
+    ];
+
+
     const updateTree = (nodes: NodeData[]): NodeData[] =>
       nodes.map((n) => {
         if (n.folderId === folderId) {
-          return { ...folderNode, children: folderNode.children };
+          return { ...n, children: newChildren, loaded: true };
         }
         return { ...n, children: updateTree(n.children) };
       });
@@ -346,6 +362,9 @@ export default function ArboristTree({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
+
+      e.stopPropagation();
+
       if (e.key === 'Enter') {
         handleCreate();
       } else if (e.key === 'Escape') {
@@ -390,7 +409,7 @@ export default function ArboristTree({
             setValue('');
             setMode('folder');
           }}
-          placeholder={mode === 'folder' ? 'New Folder' : 'New Test Case'}
+          placeholder="Folder"
           className="create-node-input"
           style={{
             flex: 1,
@@ -403,15 +422,20 @@ export default function ArboristTree({
 
         {isHovered && (
           <div className="create-hint">
-            <span style={{ opacity: 0.6 }}>or </span>
+            <span className="hint-text">or create</span>
             <button
+              onMouseDown={(e) => {
+
+                e.preventDefault();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 handleModeSwitch(mode === 'folder' ? 'case' : 'folder');
               }}
               className="mode-switch-button"
             >
-              {mode === 'folder' ? 'TestCase' : 'Suite'}
+              <Plus size={14} strokeWidth={2} />
+              {mode === 'folder' ? 'Test Case' : 'Suite'}
             </button>
           </div>
         )}
