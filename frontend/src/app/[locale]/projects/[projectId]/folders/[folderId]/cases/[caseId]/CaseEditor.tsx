@@ -45,6 +45,7 @@ type Props = {
   testTypeMessages: TestTypeMessages;
   priorityMessages: PriorityMessages;
   locale: string;
+  onUpdated?: (updatedCase: CaseType) => void;
 };
 
 export default function CaseEditor({
@@ -55,6 +56,7 @@ export default function CaseEditor({
   testTypeMessages,
   priorityMessages,
   locale,
+  onUpdated,
 }: Props) {
   const tokenContext = useContext(TokenContext);
   const [testCase, setTestCase] = useState<CaseType>(defaultTestCase);
@@ -264,6 +266,7 @@ export default function CaseEditor({
                   description: messages.updatedTestCase,
                 });
                 setIsDirty(false);
+                onUpdated?.(testCase);
               } catch (error) {
                 logError('Error updating test case', error);
                 addToast({

@@ -27,20 +27,22 @@ interface Props {
   projectId: string;
   messages: CasesMessages;
   selectedCaseId?: number;
-  onCaseUpdated?: (updatedCase: CaseType) => void;
   onCaseClick?: (caseData: CaseType) => void;
+  onCaseUpdated?: (updatedCase: CaseType) => void;
   filter?: string;
   onFilterCount?: (count: number) => void;
+  updatedCase?: CaseType; // внешнее обновление из редактора
 }
 
 export default function ArboristTree({
   projectId,
   messages,
   selectedCaseId,
-  onCaseUpdated,
   onCaseClick,
+  onCaseUpdated,
   filter = '',
   onFilterCount,
+  updatedCase,
 }: Props) {
   const ctx = useContext(TokenContext);
   const [treeData, setTreeData] = useState<NodeData[]>([]);
@@ -141,8 +143,9 @@ export default function ArboristTree({
     await loadFolder(node.data);
   };
 
-  // --- Обновление кейса ---
-  const handleCaseUpdate = (updatedCase: CaseType) => {
+  // --- Внешнее обновление кейса (из редактора) ---
+  useEffect(() => {
+    if (!updatedCase) return;
     const recursiveUpdate = (nodes: NodeData[]): NodeData[] =>
       nodes.map((n) => {
         if (n.isCase && n.caseData?.id === updatedCase.id) {
@@ -152,7 +155,7 @@ export default function ArboristTree({
       });
     setTreeData((prev) => recursiveUpdate(prev));
     onCaseUpdated?.(updatedCase);
-  };
+  }, [updatedCase, onCaseUpdated]);
 
   // --- Чекбоксы ---
   const toggleCheck = (node: NodeApi<NodeData>) => {
@@ -205,12 +208,41 @@ export default function ArboristTree({
     const success = await moveCases(ctx.token.access_token, caseIds, targetFolderId, Number(projectId));
     if (!success) return;
 
+    const movedCases = casesToMove.map((c) => ({
+      ...c,
+      folderId: targetFolderId,
+      id: `case-${c.caseData!.id}`,
+      name: c.caseData!.title,
+      isCase: true,
+      children: [],
+      loaded: true,
+      checked: false,
+      indeterminate: false,
+    }));
+
     const removeNodes = (nodes: NodeData[]): NodeData[] =>
       nodes
         .map((n) => ({ ...n, children: removeNodes(n.children) }))
         .filter((n) => !caseIds.includes(n.caseData?.id ?? -1));
 
-    setTreeData(removeNodes(treeData));
+    const addToTargetFolder = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) => {
+        if (n.folderId === targetFolderId) {
+          const existingCases = n.children.filter((child) => child.isCase);
+          const nonCaseChildren = n.children.filter((child) => !child.isCase);
+          const newCases = movedCases.filter(
+            (mc) => !existingCases.some((ec) => ec.caseData?.id === mc.caseData?.id)
+          );
+          return {
+            ...n,
+            children: [...nonCaseChildren, ...existingCases, ...newCases],
+            loaded: true,
+          };
+        }
+        return { ...n, children: addToTargetFolder(n.children) };
+      });
+
+    setTreeData((prev) => addToTargetFolder(removeNodes(prev)));
     setIsMoveDialogOpen(false);
   };
 

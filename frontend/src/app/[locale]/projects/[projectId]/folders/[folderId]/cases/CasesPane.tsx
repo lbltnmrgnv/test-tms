@@ -100,6 +100,18 @@ export default function CasesPane({ projectId, messages }: Props) {
     setDeleteCaseIds([]);
   };
 
+  const [updatedCase, setUpdatedCase] = useState<CaseType | undefined>(undefined);
+
+  const handleCaseUpdated = (updatedCase: CaseType) => {
+    if (selectedCase?.id === updatedCase.id) {
+      setSelectedCase(updatedCase);
+    }
+    // Триггерим обновление дерева
+    setUpdatedCase(updatedCase);
+    // Сбрасываем через небольшую задержку, чтобы useEffect в ArboristTree сработал
+    setTimeout(() => setUpdatedCase(undefined), 0);
+  };
+
   return (
     <>
       <div ref={containerRef} style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', overflow: 'hidden' }}>
@@ -157,9 +169,8 @@ export default function CasesPane({ projectId, messages }: Props) {
             onFilterCount={(count) => setFilteredCount(count)}
             selectedCaseId={selectedCase?.id}
             onCaseClick={(caseData: CaseType) => setSelectedCase(caseData)}
-            onCaseUpdated={(updatedCase) => {
-              if (selectedCase?.id === updatedCase.id) setSelectedCase(updatedCase);
-            }}
+            onCaseUpdated={handleCaseUpdated}
+            updatedCase={updatedCase}
           />
         </div>
 
@@ -188,6 +199,7 @@ export default function CasesPane({ projectId, messages }: Props) {
               testTypeMessages={{} as any}
               priorityMessages={{} as any}
               locale={'en'}
+              onUpdated={handleCaseUpdated}
             />
           ) : (
             <div style={{ color: 'var(--muted-color)' }}>
