@@ -249,7 +249,9 @@
     "or_drag_and_drop": " ou arraste e solte",
     "max_file_size": "Tamanho máx. do arquivo",
     "cases_imported": "Casos de teste importados",
-    "create_more": "Criar mais"
+    "create_more": "Criar mais",
+    "select_case_title": "Selecione um caso de teste",
+    "select_case_description": "Clique em um caso de teste à esquerda para abrir e editar."
   },
   "Case": {
     "back_to_cases": "Voltar para os casos de teste",

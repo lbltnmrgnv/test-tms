@@ -31,7 +31,6 @@ interface Props {
   onCaseClick?: (caseData: CaseType) => void;
   filter?: string;
   onFilterCount?: (count: number) => void;
-  searchTrigger?: boolean; // добавляем, чтобы фильтр применялся по кнопке
 }
 
 export default function ArboristTree({
@@ -42,7 +41,6 @@ export default function ArboristTree({
   onCaseClick,
   filter = '',
   onFilterCount,
-  searchTrigger = false,
 }: Props) {
   const ctx = useContext(TokenContext);
   const [treeData, setTreeData] = useState<NodeData[]>([]);
@@ -56,15 +54,6 @@ export default function ArboristTree({
   const treeContainerRef = useRef<HTMLDivElement | null>(null);
   const [treeHeight, setTreeHeight] = useState<number>(0);
   const [treeWidth, setTreeWidth] = useState(0);
-  const [treeKey, setTreeKey] = useState(0);
-  const [filterInput, setFilterInput] = useState('');
-  const [filterApplied, setFilterApplied] = useState('');
-
-  const applyFilter = () => {
-    setFilterApplied(filterInput);
-  };
-
-  const isFiltering = filter.trim().length > 0;
 
   // --- Размер дерева ---
   useEffect(() => {
@@ -351,7 +340,6 @@ export default function ArboristTree({
       >
         {treeHeight > 0 && (
           <Tree
-            key={treeKey}
             data={treeData}
             height={treeHeight}
             width={treeWidth}

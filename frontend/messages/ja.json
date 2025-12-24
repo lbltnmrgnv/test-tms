@@ -249,7 +249,9 @@
     "or_drag_and_drop": "またはドラッグアンドドロップ",
     "max_file_size": "最大ファイルサイズ",
     "cases_imported": "テストケースがインポートされました",
-    "create_more": "さらに作成"
+    "create_more": "さらに作成",
+    "select_case_title": "テストケースを選択してください",
+    "select_case_description": "左のテストケースをクリックして開き、編集します。"
   },
   "Case": {
     "back_to_cases": "テストケース一覧に戻る",

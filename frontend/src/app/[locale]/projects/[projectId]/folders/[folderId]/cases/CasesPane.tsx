@@ -115,7 +115,7 @@ export default function CasesPane({ projectId, messages }: Props) {
             flexDirection: 'column',
           }}
         >
-          {/* ФИЛЬТР + КНОПКА */}
+          {/* Фильтр по кейсам */}
           <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
             <input
               type="text"
@@ -146,7 +146,9 @@ export default function CasesPane({ projectId, messages }: Props) {
             </button>
           </div>
 
-          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)' }}>Test cases: {filteredCount}</div>
+          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)' }}>
+            Test cases: {filteredCount}
+          </div>
 
           <ArboristTree
             projectId={projectId}
@@ -189,8 +191,8 @@ export default function CasesPane({ projectId, messages }: Props) {
             />
           ) : (
             <div style={{ color: 'var(--muted-color)' }}>
-              <h3 style={{ marginTop: 20 }}>Выберите тест-кейс</h3>
-              <p>Нажмите на кейс слева, чтобы открыть его и редактировать.</p>
+              <h3 style={{ marginTop: 20 }}>{messages.selectCaseTitle}</h3>
+              <p>{messages.selectCaseDescription}</p>
             </div>
           )}
         </div>

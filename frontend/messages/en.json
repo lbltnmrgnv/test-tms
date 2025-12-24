@@ -249,7 +249,9 @@
     "or_drag_and_drop": " or drag and drop",
     "max_file_size": "Max. file size",
     "cases_imported": "Test cases imported",
-    "create_more": "Create more"
+    "create_more": "Create more",
+    "select_case_title": "Select a test case",
+    "select_case_description": "Click a test case on the left to open and edit it."
   },
   "Case": {
     "back_to_cases": "Back to test cases",

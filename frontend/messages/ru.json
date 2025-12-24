@@ -249,7 +249,9 @@
     "or_drag_and_drop": " или перетащите файл",
     "max_file_size": "Макс. размер файла",
     "cases_imported": "Тест-кейсы импортированы",
-    "create_more": "Создать ещё"
+    "create_more": "Создать ещё",
+    "select_case_title": "Выберите тест-кейс",
+    "select_case_description": "Нажмите на кейс слева, чтобы открыть его и редактировать."
   },
   "Case": {
     "back_to_cases": "Назад к тест-кейсам",

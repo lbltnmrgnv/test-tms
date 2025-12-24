@@ -106,6 +106,8 @@ type CasesMessages = {
   maxFileSize: string;
   casesImported: string;
   createMore: string;
+  selectCaseTitle: string;
+  selectCaseDescription: string;
 };
 
 type CaseMessages = {

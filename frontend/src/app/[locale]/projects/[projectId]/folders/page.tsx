@@ -58,6 +58,8 @@ export default function Page({ params }: { params: { projectId: string; folderId
     maxFileSize: t('max_file_size'),
     casesImported: t('cases_imported'),
     createMore: t('create_more'),
+    selectCaseTitle: t('select_case_title'),
+    selectCaseDescription: t('select_case_description'),
   };
 
   const priorityTranslation = useTranslations('Priority');
