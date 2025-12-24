@@ -2,12 +2,14 @@
 import { Tree, NodeApi } from 'react-arborist';
 import { useState, useEffect, useContext, useRef } from 'react';
 import { TokenContext } from '@/utils/TokenProvider';
-import { fetchFolders } from './foldersControl';
-import { fetchCases, moveCases, searchCases } from '@/utils/caseControl';
+import { fetchFolders, createFolder } from './foldersControl';
+import { fetchCases, moveCases, searchCases, createCase } from '@/utils/caseControl';
 import { FolderType } from '@/types/folder';
 import { CaseType, CasesMessages } from '@/types/case';
-import { Folder, ChevronRight, ChevronDown, Bot, Hand } from 'lucide-react';
+import { Folder, ChevronRight, ChevronDown, Bot, Hand, Plus } from 'lucide-react';
 import CaseDialog from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/CaseMoveDialog';
+
+type CreateMode = 'folder' | 'case';
 
 interface NodeData {
   id: string;
@@ -21,6 +23,8 @@ interface NodeData {
   checked?: boolean;
   indeterminate?: boolean;
   open?: boolean;
+  isCreateNode?: boolean;
+  createParentId?: number;
 }
 
 interface Props {
@@ -118,6 +122,15 @@ export default function ArboristTree({
         children: [],
         loaded: true,
       })),
+      // Добавляем создающий узел в конец
+      {
+        id: `create-${folder.folderId}`,
+        name: 'New Folder',
+        isCreateNode: true,
+        createParentId: folder.folderId,
+        children: [],
+        loaded: true,
+      },
     ];
 
     const updateNodes = (nodes: NodeData[]): NodeData[] =>
@@ -131,6 +144,42 @@ export default function ArboristTree({
       );
 
     setTreeData((prev) => updateNodes(prev));
+  };
+
+  // --- Перезагрузка папки после создания ---
+  const reloadFolder = async (folderId: number) => {
+    let folder = allFolders.find((f) => f.id === folderId);
+
+    if (!folder) {
+      // Если папки нет в allFolders, перезагружаем все папки
+      const fetchedFolders = await fetchFolders(ctx.token.access_token, Number(projectId));
+      setAllFolders(fetchedFolders);
+      folder = fetchedFolders.find((f: FolderType) => f.id === folderId);
+      if (!folder) return;
+    }
+
+    // Принудительно перезагрузить содержимое папки
+    const folderNode: NodeData = {
+      id: `folder-${folderId}`,
+      name: folder.name,
+      folderId: folderId,
+      parentFolderId: folder.parentFolderId,
+      children: [],
+      loaded: false,
+    };
+
+    await loadFolder(folderNode);
+
+    // Обновить дерево
+    const updateTree = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) => {
+        if (n.folderId === folderId) {
+          return { ...folderNode, children: folderNode.children };
+        }
+        return { ...n, children: updateTree(n.children) };
+      });
+
+    setTreeData((prev) => updateTree(prev));
   };
 
   // --- Клик по узлу ---
@@ -246,6 +295,130 @@ export default function ArboristTree({
     setIsMoveDialogOpen(false);
   };
 
+  // --- Компонент для создания нового элемента ---
+  const CreateNodeRow = ({
+    parentFolderId,
+    style,
+    level,
+  }: {
+    parentFolderId: number;
+    style: React.CSSProperties;
+    level: number;
+  }) => {
+    const [mode, setMode] = useState<CreateMode>('folder');
+    const [value, setValue] = useState('');
+    const [isHovered, setIsHovered] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    const handleModeSwitch = (newMode: CreateMode) => {
+      setMode(newMode);
+      setValue('');
+      inputRef.current?.focus();
+    };
+
+    const handleCreate = async () => {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) return;
+
+      if (mode === 'folder') {
+        const newFolder = await createFolder(
+          ctx.token.access_token,
+          trimmedValue,
+          '',
+          projectId,
+          parentFolderId
+        );
+
+        if (newFolder) {
+          setAllFolders((prev) => [...prev, newFolder]);
+        }
+      } else {
+        const newCase = await createCase(ctx.token.access_token, String(parentFolderId), trimmedValue, '');
+
+        if (newCase && onCaseClick) {
+          onCaseClick(newCase);
+        }
+      }
+
+      setValue('');
+      setMode('folder');
+      await reloadFolder(parentFolderId);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        handleCreate();
+      } else if (e.key === 'Escape') {
+        setValue('');
+        setMode('folder');
+        inputRef.current?.blur();
+      }
+    };
+
+    return (
+      <div
+        style={{
+          ...style,
+          display: 'flex',
+          flex: '1 1 auto',
+          paddingLeft: level * 12,
+          width: '100%',
+          boxSizing: 'border-box',
+          overflow: 'hidden',
+          alignItems: 'center',
+          gap: '8px',
+        }}
+        className="tree-row create-node-row"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        <div className="icon-wrap">
+          {mode === 'folder' ? (
+            <Folder size={17} strokeWidth={1.4} />
+          ) : (
+            <Plus size={17} strokeWidth={1.4} />
+          )}
+        </div>
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={() => {
+            setValue('');
+            setMode('folder');
+          }}
+          placeholder={mode === 'folder' ? 'New Folder' : 'New Test Case'}
+          className="create-node-input"
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            fontSize: 'inherit',
+          }}
+        />
+
+        {isHovered && (
+          <div className="create-hint">
+            <span style={{ opacity: 0.6 }}>or </span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleModeSwitch(mode === 'folder' ? 'case' : 'folder');
+              }}
+              className="mode-switch-button"
+            >
+              {mode === 'folder' ? 'TestCase' : 'Suite'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   // --- Иконка кейса ---
   const renderCaseIcon = (caseData: CaseType) =>
     caseData.automationStatus === 1 ? <Bot size={16} strokeWidth={1.5} /> : <Hand size={16} strokeWidth={1.5} />;
@@ -352,6 +525,18 @@ export default function ArboristTree({
         if (node.parentFolderId === null) roots.push(node);
       });
 
+      // Добавляем создающие узлы для каждой папки
+      Object.values(folderMap).forEach((node) => {
+        node.children.push({
+          id: `create-${node.folderId}`,
+          name: 'New Folder',
+          isCreateNode: true,
+          createParentId: node.folderId,
+          children: [],
+          loaded: true,
+        });
+      });
+
       setTreeData(roots);
     };
 
@@ -378,13 +563,23 @@ export default function ArboristTree({
             childrenAccessor="children"
             openByDefault={false}
             onMove={handleMove}
-            disableDrag={(node) => !node.isCase}
+            disableDrag={(node) => !node.isCase || node.isCreateNode === true}
             disableDrop={({ parentNode }) => !parentNode?.data.folderId}
           >
             {({ node, style, dragHandle }) => {
               if (node.data.isCase && node.data.caseData) {
                 nodesMapRef.current[node.data.caseData.id] = node;
               }
+
+              // Рендеринг создающего узла (только для разработчиков)
+              if (node.data.isCreateNode && node.data.createParentId) {
+                if (!ctx.isProjectDeveloper(Number(projectId))) {
+                  return null;
+                }
+                return <CreateNodeRow parentFolderId={node.data.createParentId} style={style} level={node.level} />;
+              }
+
+              // Рендеринг обычных узлов
               return (
                 <div
                   style={{
