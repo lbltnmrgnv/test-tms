@@ -116,11 +116,19 @@ input {
 /* Стили для элементов создания папок/кейсов */
 .create-node-row {
     opacity: 0.7;
-    transition: opacity 0.2s;
+    transition: opacity 0.2s, background 0.2s;
 }
 
 .create-node-row:hover {
     opacity: 1;
+}
+
+[data-theme='dark'] .create-node-row:hover {
+    background: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme='light'] .create-node-row:hover {
+    background: rgba(0, 0, 0, 0.06);
 }
 
 .create-node-input {
@@ -162,11 +170,11 @@ input {
 .mode-switch-button {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
     background: rgba(128, 128, 128, 0.15);
     border: 1px solid rgba(128, 128, 128, 0.3);
-    border-radius: 4px;
-    padding: 3px 8px;
+    border-radius: 3px;
+    padding: 2px 6px;
     cursor: pointer;
     font-size: 0.875em;
     transition: all 0.2s;

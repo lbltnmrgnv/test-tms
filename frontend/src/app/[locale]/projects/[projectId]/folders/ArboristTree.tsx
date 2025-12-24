@@ -324,6 +324,7 @@ export default function ArboristTree({
     const [mode, setMode] = useState<CreateMode>('folder');
     const [value, setValue] = useState('');
     const [isHovered, setIsHovered] = useState(false);
+    const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
     const handleModeSwitch = (newMode: CreateMode) => {
@@ -385,7 +386,7 @@ export default function ArboristTree({
           boxSizing: 'border-box',
           overflow: 'hidden',
           alignItems: 'center',
-          gap: '8px',
+          gap: '4px',
         }}
         className="tree-row create-node-row"
         onMouseEnter={() => setIsHovered(true)}
@@ -405,23 +406,28 @@ export default function ArboristTree({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={() => setIsFocused(true)}
           onBlur={() => {
-            setValue('');
-            setMode('folder');
+            if (!value.trim()) {
+              setValue('');
+              setMode('folder');
+            }
+            setIsFocused(false);
           }}
-          placeholder="Folder"
+          placeholder={mode === 'folder' ? 'Folder' : 'Test Case'}
           className="create-node-input"
           style={{
-            flex: 1,
+            flex: '0 0 auto',
+            width: value ? 'auto' : (mode === 'folder' ? '6ch' : '9ch'),
+            minWidth: mode === 'folder' ? '6ch' : '9ch',
             border: 'none',
             outline: 'none',
             background: 'transparent',
             fontSize: 'inherit',
           }}
         />
-
-        {isHovered && (
-          <div className="create-hint">
+        {isHovered && !value && (
+          <>
             <span className="hint-text">or create</span>
             <button
               onMouseDown={(e) => {
@@ -435,9 +441,9 @@ export default function ArboristTree({
               className="mode-switch-button"
             >
               <Plus size={14} strokeWidth={2} />
-              {mode === 'folder' ? 'Test Case' : 'Suite'}
+              {mode === 'folder' ? 'Test Case' : 'Folder'}
             </button>
-          </div>
+          </>
         )}
       </div>
     );
