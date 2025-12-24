@@ -23,9 +23,7 @@ export default function SidebarLayout({
     <>
       <div className="flex border-t-1 dark:border-neutral-700 min-h-[calc(100vh-64px)]">
         <Sidebar messages={messages} locale={locale} />
-        <div className="flex w-full">
-          <div className="flex-grow">{children}</div>
-        </div>
+        <div className="flex flex-col flex-1 min-h-0">{children}</div>
       </div>
     </>
   );

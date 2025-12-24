@@ -26,6 +26,42 @@ async function fetchCase(jwt: string, caseId: number) {
   }
 }
 
+async function searchCases(
+  jwt: string,
+  projectId: number,
+  filterText?: string,
+  priority?: number[],
+  type?: number[],
+  tag?: number[]
+) {
+  const queryParams = [`projectId=${projectId}`];
+
+  if (filterText) queryParams.push(`search=${encodeURIComponent(filterText)}`);
+  if (priority && priority.length) queryParams.push(`priority=${priority.join(',')}`);
+  if (type && type.length) queryParams.push(`type=${type.join(',')}`);
+  if (tag && tag.length) queryParams.push(`tag=${tag.join(',')}`);
+
+  const query = queryParams.length ? `?${queryParams.join('&')}` : '';
+  const url = `${apiServer}/cases/search${query}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    });
+
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    const data = await response.json();
+    return data || [];
+  } catch (error: unknown) {
+    logError('Error searching cases', error);
+    return [];
+  }
+}
+
 async function fetchCases(
   jwt: string,
   folderId: number,
@@ -256,4 +292,4 @@ async function importCases(jwt: string, folderId: number, file: File) {
   }
 }
 
-export { fetchCase, fetchCases, updateCase, createCase, deleteCases, cloneCases, exportCases, importCases };
+export { fetchCase, fetchCases, updateCase, createCase, deleteCases, cloneCases, exportCases, importCases, searchCases };

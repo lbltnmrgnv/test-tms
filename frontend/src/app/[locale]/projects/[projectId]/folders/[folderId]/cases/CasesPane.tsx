@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useContext } from 'react';
+import { useState, useRef, useEffect, useContext, ChangeEvent } from 'react';
 import { addToast } from '@heroui/react';
 import { TokenContext } from '@/utils/TokenProvider';
 import { createCase } from '@/utils/caseControl';
@@ -12,6 +12,7 @@ import CaseEditor from '@/src/app/[locale]/projects/[projectId]/folders/[folderI
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
 import { LocaleCodeType } from '@/types/locale';
+import { Search } from 'lucide-react';
 
 type Props = {
   projectId: string;
@@ -25,22 +26,32 @@ type Props = {
 export default function CasesPane({ projectId, messages }: Props) {
   const context = useContext(TokenContext);
 
-  // состояние модалок / прочее
   const [isCaseDialogOpen, setIsCaseDialogOpen] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<number | undefined>(undefined);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [deleteCaseIds, setDeleteCaseIds] = useState<number[]>([]);
-
-  // выбранный кейс (справа)
   const [selectedCase, setSelectedCase] = useState<CaseType | null>(null);
 
-  // -------------------- Resizable Split --------------------
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [leftWidth, setLeftWidth] = useState<number>(400);
   const [isResizing, setIsResizing] = useState(false);
+  const [filteredCount, setFilteredCount] = useState(0);
 
-  // === УСТАНАВЛИВАЕМ ЦЕНТР ПРИ ПЕРВОЙ ЗАГРУЗКЕ ===
+  const [filterInput, setFilterInput] = useState('');
+  const [appliedFilter, setAppliedFilter] = useState('');
+
+  const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
+    setFilterInput(e.target.value);
+  };
+
+  useEffect(() => {
+    if (filterInput === '') {
+      setAppliedFilter('');
+    }
+  }, [filterInput]);
+
+  // --- Resizable Split ---
   useEffect(() => {
     if (containerRef.current) {
       const containerWidth = containerRef.current.offsetWidth;
@@ -48,28 +59,22 @@ export default function CasesPane({ projectId, messages }: Props) {
     }
   }, []);
 
-  // Начало ресайза
   const startResizing = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
   };
 
-  // Движение ресайза
   useEffect(() => {
     if (!isResizing) return;
 
     const onMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
-
       let newWidth = e.clientX - rect.left;
-
       const minLeft = 200;
       const minRight = 200;
-
       if (newWidth < minLeft) newWidth = minLeft;
       if (newWidth > rect.width - minRight) newWidth = rect.width - minRight;
-
       setLeftWidth(newWidth);
     };
 
@@ -84,11 +89,9 @@ export default function CasesPane({ projectId, messages }: Props) {
     };
   }, [isResizing]);
 
-  // -------------------- Создание кейса --------------------
   const handleCreateCase = async (title: string, description: string, folderId?: number, createMore?: boolean) => {
     const newCase = await createCase(context.token.access_token, String(folderId), title, description);
     addToast({ title: 'Success', color: 'success', description: `Case "${title}" created` });
-
     if (!createMore) setIsCaseDialogOpen(false);
   };
 
@@ -97,22 +100,67 @@ export default function CasesPane({ projectId, messages }: Props) {
     setDeleteCaseIds([]);
   };
 
-  // -------------------- Рендер --------------------
   return (
     <>
-      <div ref={containerRef} style={{ display: 'flex', width: '100%', height: '100%', minHeight: 400 }}>
+      <div ref={containerRef} style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', overflow: 'hidden' }}>
         {/* ЛЕВАЯ ПАНЕЛЬ */}
-        <div style={{ width: leftWidth, overflow: 'auto', borderRight: '1px solid var(--border-color)', padding: '12px 8px' }}>
+        <div
+          style={{
+            width: leftWidth,
+            overflow: 'auto',
+            borderRight: '1px solid var(--border-color)',
+            padding: '12px 8px',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* ФИЛЬТР + КНОПКА */}
+          <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
+            <input
+              type="text"
+              placeholder="Search or filter"
+              value={filterInput}
+              onChange={handleFilterChange}
+              className="
+                flex-1
+                px-2 py-1
+                rounded
+                border
+                border-gray-300 dark:border-gray-600
+                bg-transparent
+                text-gray-900 dark:text-gray-100
+                placeholder-gray-400 dark:placeholder-gray-500
+                outline-none
+                focus:outline-none
+                focus:ring-0
+                focus:ring-transparent
+                focus:border-blue-500 dark:focus:border-blue-400
+              "
+            />
+            <button
+              onClick={() => setAppliedFilter(filterInput)}
+              style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border-color)' }}
+            >
+              <Search size={16} strokeWidth={1.5} />
+            </button>
+          </div>
+
+          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)' }}>Test cases: {filteredCount}</div>
+
           <ArboristTree
             projectId={projectId}
             messages={messages}
-            onCaseClick={(caseData: CaseType) => {
-              setSelectedCase(caseData);
+            filter={appliedFilter}
+            onFilterCount={(count) => setFilteredCount(count)}
+            selectedCaseId={selectedCase?.id}
+            onCaseClick={(caseData: CaseType) => setSelectedCase(caseData)}
+            onCaseUpdated={(updatedCase) => {
+              if (selectedCase?.id === updatedCase.id) setSelectedCase(updatedCase);
             }}
           />
         </div>
 
-        {/* РЕЗАЙЗ БАР */}
         <div
           role="separator"
           aria-orientation="vertical"

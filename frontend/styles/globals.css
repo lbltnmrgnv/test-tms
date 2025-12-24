@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 
-.tree-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    height: 26px;
-    cursor: pointer;
-    user-select: none;
-    transition: background 0.15s;
-}
+/*.tree-row {*/
+/*    display: flex;*/
+/*    align-items: center;*/
+/*    gap: 6px;*/
+/*    height: 26px;*/
+/*    cursor: pointer;*/
+/*    user-select: none;*/
+/*    transition: background 0.15s;*/
+/*}*/
 
 [data-theme='dark'] .tree-row {
     color: #e6e9ef;
@@ -78,4 +78,37 @@
     font-size: 12px;
     font-weight: 600;
     pointer-events: none;
+}
+
+.tree-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    height: 28px;              /* ← фиксируем строку */
+    min-height: 28px;
+
+    width: 100%;
+    overflow: hidden;
+}
+
+.title {
+    flex: 1;
+    min-width: 0;
+
+    white-space: nowrap;       /* ← КЛЮЧ */
+    overflow: hidden;
+    text-overflow: ellipsis;   /* ← … */
+}
+
+.selected-case {
+    background-color: rgba(59, 130, 246, 0.2); /* светло-синий */
+}
+[data-theme='dark'] .selected-case {
+    background-color: rgba(59, 130, 246, 0.4); /* чуть ярче для тёмной темы */
+}
+
+input {
+    -webkit-tap-highlight-color: transparent;
 }

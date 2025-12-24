@@ -1,13 +1,12 @@
-// Updated code with folder reload on each click
 'use client';
-import { Tree, NodeApi } from "react-arborist";
-import { useState, useEffect, useContext } from "react";
-import { TokenContext } from "@/utils/TokenProvider";
-import { fetchFolders } from "./foldersControl";
-import { fetchCases, moveCases } from "@/utils/caseControl";
-import { FolderType } from "@/types/folder";
-import { CaseType, CasesMessages } from "@/types/case";
-import { Folder, ChevronRight, ChevronDown } from "lucide-react";
+import { Tree, NodeApi } from 'react-arborist';
+import { useState, useEffect, useContext, useRef } from 'react';
+import { TokenContext } from '@/utils/TokenProvider';
+import { fetchFolders } from './foldersControl';
+import { fetchCases, moveCases, searchCases } from '@/utils/caseControl';
+import { FolderType } from '@/types/folder';
+import { CaseType, CasesMessages } from '@/types/case';
+import { Folder, ChevronRight, ChevronDown, Bot, Hand } from 'lucide-react';
 import CaseDialog from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/CaseMoveDialog';
 
 interface NodeData {
@@ -21,28 +20,68 @@ interface NodeData {
   parentFolderId?: number | null;
   checked?: boolean;
   indeterminate?: boolean;
+  open?: boolean;
 }
 
 interface Props {
   projectId: string;
   messages: CasesMessages;
+  selectedCaseId?: number;
+  onCaseUpdated?: (updatedCase: CaseType) => void;
   onCaseClick?: (caseData: CaseType) => void;
+  filter?: string;
+  onFilterCount?: (count: number) => void;
+  searchTrigger?: boolean; // добавляем, чтобы фильтр применялся по кнопке
 }
 
-export default function ArboristTree({ projectId, messages, onCaseClick }: Props) {
+export default function ArboristTree({
+  projectId,
+  messages,
+  selectedCaseId,
+  onCaseUpdated,
+  onCaseClick,
+  filter = '',
+  onFilterCount,
+  searchTrigger = false,
+}: Props) {
   const ctx = useContext(TokenContext);
   const [treeData, setTreeData] = useState<NodeData[]>([]);
   const [allFolders, setAllFolders] = useState<FolderType[]>([]);
+  const nodesMapRef = useRef<Record<number, NodeApi<NodeData>>>({});
 
-  // Dialog
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [casesToMove, setCasesToMove] = useState<NodeData[]>([]);
   const [targetFolderId, setTargetFolderId] = useState<number | undefined>(undefined);
 
+  const treeContainerRef = useRef<HTMLDivElement | null>(null);
+  const [treeHeight, setTreeHeight] = useState<number>(0);
+  const [treeWidth, setTreeWidth] = useState(0);
+  const [treeKey, setTreeKey] = useState(0);
+  const [filterInput, setFilterInput] = useState('');
+  const [filterApplied, setFilterApplied] = useState('');
+
+  const applyFilter = () => {
+    setFilterApplied(filterInput);
+  };
+
+  const isFiltering = filter.trim().length > 0;
+
+  // --- Размер дерева ---
+  useEffect(() => {
+    if (!treeContainerRef.current) return;
+    const update = () => {
+      setTreeHeight(treeContainerRef.current!.offsetHeight);
+      setTreeWidth(treeContainerRef.current!.offsetWidth);
+    };
+    requestAnimationFrame(update);
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
+
+  // --- Загрузка папок ---
   useEffect(() => {
     if (!ctx.isSignedIn()) return;
-
-    fetchFolders(ctx.token.access_token, Number(projectId)).then(folders => {
+    fetchFolders(ctx.token.access_token, Number(projectId)).then((folders) => {
       setAllFolders(folders);
       const roots = folders
         .filter((f: FolderType) => f.parentFolderId === null)
@@ -51,22 +90,24 @@ export default function ArboristTree({ projectId, messages, onCaseClick }: Props
           name: f.name,
           children: [],
           folderId: f.id,
-          loaded: false,
           parentFolderId: null,
+          loaded: false,
           checked: false,
           indeterminate: false,
+          open: false,
         }));
       setTreeData(roots);
     });
   }, [projectId, ctx]);
 
-  // FORCE RELOAD on every click → always fetch fresh cases
+  // --- Загрузка кейсов в папку ---
   const loadFolder = async (folder: NodeData) => {
-    const subFolders = allFolders.filter(f => f.parentFolderId === folder.folderId);
-    const cases = await fetchCases(ctx.token.access_token, Number(folder.folderId));
+    if (folder.loaded) return; // не грузим повторно
+    const subFolders = allFolders.filter((f) => f.parentFolderId === folder.folderId);
+    const fetchedCases = await fetchCases(ctx.token.access_token, Number(folder.folderId));
 
     const children: NodeData[] = [
-      ...subFolders.map(f => ({
+      ...subFolders.map((f) => ({
         id: `folder-${f.id}`,
         name: f.name,
         children: [],
@@ -75,83 +116,83 @@ export default function ArboristTree({ projectId, messages, onCaseClick }: Props
         loaded: false,
         checked: false,
         indeterminate: false,
+        open: false,
       })),
-      ...cases.map((c: CaseType) => ({
+      ...fetchedCases.map((c: CaseType) => ({
         id: `case-${c.id}`,
         name: c.title,
-        children: [],
         isCase: true,
         caseData: c,
         folderId: folder.folderId,
+        children: [],
         loaded: true,
-        checked: false,
-        indeterminate: false,
       })),
     ];
 
-    const update = (nodes: NodeData[]): NodeData[] =>
-      nodes.map(n =>
+    const updateNodes = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) =>
         n.id === folder.id
           ? { ...n, children, loaded: true }
-          : { ...n, children: update(n.children) }
+          : {
+              ...n,
+              children: updateNodes(n.children),
+            }
       );
 
-    setTreeData(update(treeData));
+    setTreeData((prev) => updateNodes(prev));
   };
 
+  // --- Клик по узлу ---
   const handleClick = async (node: NodeApi<NodeData>) => {
-    const d = node.data;
-
-    if (d.isCase && d.caseData) {
-      onCaseClick?.(d.caseData);
+    if (node.data.isCase && node.data.caseData) {
+      onCaseClick?.(node.data.caseData);
       return;
     }
-
     node.toggle();
-    await loadFolder(d); // ALWAYS reload folder
+    await loadFolder(node.data);
   };
 
+  // --- Обновление кейса ---
+  const handleCaseUpdate = (updatedCase: CaseType) => {
+    const recursiveUpdate = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) => {
+        if (n.isCase && n.caseData?.id === updatedCase.id) {
+          return { ...n, name: updatedCase.title, caseData: { ...updatedCase } };
+        }
+        return { ...n, children: recursiveUpdate(n.children) };
+      });
+    setTreeData((prev) => recursiveUpdate(prev));
+    onCaseUpdated?.(updatedCase);
+  };
+
+  // --- Чекбоксы ---
   const toggleCheck = (node: NodeApi<NodeData>) => {
     const newState = !node.data.checked;
-
     const updateChildren = (nodes: NodeData[], state: boolean): NodeData[] =>
-      nodes.map(n => ({ ...n, checked: state, indeterminate: false, children: updateChildren(n.children, state) }));
-
+      nodes.map((n) => ({ ...n, checked: state, indeterminate: false, children: updateChildren(n.children, state) }));
     const applyUpdate = (nodes: NodeData[]): NodeData[] =>
-      nodes.map(n =>
+      nodes.map((n) =>
         n.id === node.data.id
           ? { ...n, checked: newState, indeterminate: false, children: updateChildren(n.children, newState) }
           : { ...n, children: applyUpdate(n.children) }
       );
-
     const updateParents = (nodes: NodeData[]): NodeData[] => {
       const process = (n: NodeData): NodeData => {
         if (!n.children.length) return n;
         const children = n.children.map(process);
-        const allChecked = children.every(c => c.checked);
-        const noneChecked = children.every(c => !c.checked && !c.indeterminate);
+        const allChecked = children.every((c) => c.checked);
+        const noneChecked = children.every((c) => !c.checked && !c.indeterminate);
         return { ...n, children, checked: allChecked, indeterminate: !allChecked && !noneChecked };
       };
       return nodes.map(process);
     };
-
     setTreeData(updateParents(applyUpdate(treeData)));
   };
 
-  const getNodesByIds = (ids: string[], nodes: NodeData[]): NodeData[] => {
-    let result: NodeData[] = [];
-    for (const n of nodes) {
-      if (ids.includes(n.id)) result.push(n);
-      result = result.concat(getNodesByIds(ids, n.children));
-    }
-    return result;
-  };
-
+  // --- Drag & Drop ---
   const handleMove = async ({ dragIds, parentNode }: { dragIds: string[]; parentNode: NodeApi<NodeData> | null }) => {
     if (!parentNode?.data.folderId) return;
-
     const targetId = parentNode.data.folderId;
-
     const getCheckedCases = (nodes: NodeData[]): NodeData[] => {
       let result: NodeData[] = [];
       for (const n of nodes) {
@@ -160,13 +201,10 @@ export default function ArboristTree({ projectId, messages, onCaseClick }: Props
       }
       return result;
     };
-
     const selectedCases = getCheckedCases(treeData);
-    const dragCases = getNodesByIds(dragIds, treeData).filter(n => n.isCase);
+    const dragCases = dragIds.map((id) => nodesMapRef.current[Number(id.replace('case-', ''))]?.data).filter(Boolean);
     const finalCases = selectedCases.length ? selectedCases : dragCases;
-
     if (!finalCases.length) return;
-
     setCasesToMove(finalCases);
     setTargetFolderId(targetId);
     setIsMoveDialogOpen(true);
@@ -174,66 +212,212 @@ export default function ArboristTree({ projectId, messages, onCaseClick }: Props
 
   const handleMoved = async () => {
     if (!targetFolderId) return;
-
-    const caseIds = casesToMove.map(c => c.caseData!.id);
+    const caseIds = casesToMove.map((c) => c.caseData!.id);
     const success = await moveCases(ctx.token.access_token, caseIds, targetFolderId, Number(projectId));
-
     if (!success) return;
 
     const removeNodes = (nodes: NodeData[]): NodeData[] =>
       nodes
-        .map(n => ({ ...n, children: removeNodes(n.children) }))
-        .filter(n => !caseIds.includes(n.caseData?.id ?? -1));
+        .map((n) => ({ ...n, children: removeNodes(n.children) }))
+        .filter((n) => !caseIds.includes(n.caseData?.id ?? -1));
 
     setTreeData(removeNodes(treeData));
     setIsMoveDialogOpen(false);
   };
 
+  // --- Иконка кейса ---
+  const renderCaseIcon = (caseData: CaseType) =>
+    caseData.automationStatus === 1 ? <Bot size={16} strokeWidth={1.5} /> : <Hand size={16} strokeWidth={1.5} />;
+
+  // --- Состояние open для фильтрации ---
+  const openStateMap = useRef(new Map<number, boolean>());
+  const saveOpenState = (nodes: NodeData[]) => {
+    nodes.forEach((n) => {
+      if (n.folderId) openStateMap.current.set(n.folderId, n.open ?? false);
+      if (n.children.length) saveOpenState(n.children);
+    });
+  };
+  saveOpenState(treeData);
+
+  // --- Фильтрация только при trigger ---
+  useEffect(() => {
+    if (!filter.trim()) {
+      // --- сброс к исходному дереву ---
+      const loadFullTree = async () => {
+        // сначала корневые папки
+        const roots = allFolders
+          .filter((f) => f.parentFolderId === null)
+          .map((f) => ({
+            id: `folder-${f.id}`,
+            name: f.name,
+            folderId: f.id,
+            parentFolderId: null,
+            children: [],
+            loaded: false,
+            checked: false,
+            indeterminate: false,
+            open: false,
+          }));
+
+        setTreeData(roots);
+
+        // рекурсивно подгружаем кейсы для всех папок
+        const loadCasesRecursively = async (nodes: NodeData[]) => {
+          for (const node of nodes) {
+            if (node.folderId) {
+              await loadFolder(node);
+              if (node.children.length) await loadCasesRecursively(node.children);
+            }
+          }
+        };
+
+        await loadCasesRecursively(roots);
+      };
+
+      loadFullTree();
+      onFilterCount?.(0);
+      return;
+    }
+
+    const loadFilteredTree = async () => {
+      const cases: CaseType[] = await searchCases(ctx.token.access_token, Number(projectId), filter);
+      onFilterCount?.(cases.length);
+
+      const folderMap: Record<number, NodeData> = {};
+      cases.forEach((c) => {
+        let f = allFolders.find((f) => f.id === c.folderId);
+        if (!f) return;
+        const path: FolderType[] = [];
+        while (f) {
+          path.unshift(f);
+          f = f.parentFolderId !== null ? allFolders.find((x) => x.id === f?.parentFolderId) : undefined;
+        }
+
+        let parentNode: NodeData | undefined;
+        path.forEach((folder) => {
+          if (!folderMap[folder.id]) {
+            folderMap[folder.id] = {
+              id: `folder-${folder.id}`,
+              name: folder.name,
+              folderId: folder.id,
+              parentFolderId: folder.parentFolderId,
+              children: [],
+              loaded: true,
+              checked: false,
+              indeterminate: false,
+              open: openStateMap.current.get(folder.id) ?? false,
+            };
+          }
+          if (parentNode) {
+            const exists = parentNode.children.find((c) => c.id === `folder-${folder.id}`);
+            if (!exists) parentNode.children.push(folderMap[folder.id]);
+          }
+          parentNode = folderMap[folder.id];
+        });
+
+        parentNode?.children.push({
+          id: `case-${c.id}`,
+          name: c.title,
+          isCase: true,
+          caseData: c,
+          folderId: c.folderId,
+          children: [],
+          loaded: true,
+        });
+      });
+
+      const roots: NodeData[] = [];
+      Object.values(folderMap).forEach((node) => {
+        if (node.parentFolderId === null) roots.push(node);
+      });
+
+      setTreeData(roots);
+    };
+
+    loadFilteredTree();
+  }, [filter]);
+
   return (
     <>
-      <Tree
-        data={treeData}
-        childrenAccessor="children"
-        openByDefault={false}
-        onMove={handleMove}
-        disableDrag={node => !node.isCase}
-        disableDrop={({ parentNode }) => !parentNode?.data.folderId}
+      <div
+        ref={treeContainerRef}
+        style={{
+          height: '100%',
+          width: '100%',
+          minWidth: 0,
+          overflowX: 'hidden',
+          overflowY: 'auto',
+        }}
       >
-        {({ node, style, dragHandle }) => (
-          <div
-            style={{ ...style, paddingLeft: node.level * 12 }}
-            className="tree-row"
-            onClick={() => handleClick(node)}
-            ref={dragHandle}
+        {treeHeight > 0 && (
+          <Tree
+            key={treeKey}
+            data={treeData}
+            height={treeHeight}
+            width={treeWidth}
+            childrenAccessor="children"
+            openByDefault={false}
+            onMove={handleMove}
+            disableDrag={(node) => !node.isCase}
+            disableDrop={({ parentNode }) => !parentNode?.data.folderId}
           >
-            <input
-              type="checkbox"
-              checked={node.data.checked || false}
-              ref={el => { if (el) el.indeterminate = node.data.indeterminate || false; }}
-              onClick={e => { e.stopPropagation(); toggleCheck(node); }}
-              className="checkbox-input"
-            />
-            <div className="icon-wrap">
-              {node.data.isCase ? "📝" : (
-                <>
-                  <Folder className="folder-icon" size={17} strokeWidth={1.4} />
-                  {!node.isOpen ? (
-                    <ChevronRight className="hover-icon" size={17} strokeWidth={1.6} />
-                  ) : (
-                    <ChevronDown className="hover-icon" size={17} strokeWidth={1.6} />
-                  )}
-                </>
-              )}
-            </div>
-            <span className="title">{node.data.name}</span>
-          </div>
+            {({ node, style, dragHandle }) => {
+              if (node.data.isCase && node.data.caseData) {
+                nodesMapRef.current[node.data.caseData.id] = node;
+              }
+              return (
+                <div
+                  style={{
+                    ...style,
+                    display: 'flex',
+                    flex: '1 1 auto',
+                    paddingLeft: node.level * 12,
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    overflow: 'hidden',
+                  }}
+                  className={`tree-row ${node.data.isCase && node.data.caseData?.id === selectedCaseId ? 'selected-case' : ''}`}
+                  onClick={() => handleClick(node)}
+                  ref={dragHandle}
+                >
+                  <input
+                    type="checkbox"
+                    checked={node.data.checked || false}
+                    ref={(el) => {
+                      if (el) el.indeterminate = node.data.indeterminate || false;
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCheck(node);
+                    }}
+                    className="checkbox-input"
+                  />
+                  <div className="icon-wrap">
+                    {node.data.isCase && node.data.caseData ? (
+                      renderCaseIcon(node.data.caseData)
+                    ) : (
+                      <>
+                        <Folder className="folder-icon" size={17} strokeWidth={1.4} />
+                        {!node.isOpen ? (
+                          <ChevronRight className="hover-icon" size={17} strokeWidth={1.6} />
+                        ) : (
+                          <ChevronDown className="hover-icon" size={17} strokeWidth={1.6} />
+                        )}
+                      </>
+                    )}
+                  </div>
+                  <span className="title">{node.data.name}</span>
+                </div>
+              );
+            }}
+          </Tree>
         )}
-      </Tree>
+      </div>
 
       {isMoveDialogOpen && (
         <CaseDialog
           isOpen={isMoveDialogOpen}
-          testCaseIds={casesToMove.map(c => c.caseData!.id)}
+          testCaseIds={casesToMove.map((c) => c.caseData!.id)}
           projectId={projectId}
           targetFolderId={targetFolderId}
           isDisabled={!ctx.isProjectDeveloper(Number(projectId))}
