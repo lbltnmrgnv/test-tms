@@ -1,12 +1,11 @@
 import { useState, useEffect, useContext } from 'react';
-import { TokenContext } from '@/utils/TokenProvider';
-import { fetchFolders } from './foldersControl';
-import { fetchCases } from '@/utils/caseControl';
-import { buildFolderTree } from '@/utils/buildFolderTree';
 import { TreeNodeData } from '@/types/folder';
-import { CaseType } from '@/types/case';
-import FolderItem from './FolderItem';
 import { FolderType, FoldersMessages } from '@/types/folder';
+import { buildFolderTree } from '@/utils/buildFolderTree';
+import { fetchCases } from '@/utils/caseControl';
+import { TokenContext } from '@/utils/TokenProvider';
+import FolderItem from './FolderItem';
+import { fetchFolders } from './foldersControl';
 
 type Props = {
   projectId: string;
@@ -17,7 +16,6 @@ export default function TreeView({ projectId, onCaseClick }: Props) {
   const context = useContext(TokenContext);
   const [treeData, setTreeData] = useState<TreeNodeData[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [selectedFolder, setSelectedFolder] = useState<FolderType | null>(null);
 
   // Загрузка корневых папок
   useEffect(() => {
@@ -88,7 +86,7 @@ export default function TreeView({ projectId, onCaseClick }: Props) {
             toggle={() => toggleFolder(node.id)}
             style={{ paddingLeft: 8 }}
             projectId={projectId}
-            selectedFolder={selectedFolder}
+            selectedFolder={null}
             locale="en"
             messages={{} as FoldersMessages}
             openDialogForCreate={() => {}}

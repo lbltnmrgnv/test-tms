@@ -1,18 +1,19 @@
 'use client';
-import { useState, useRef, useEffect, useContext, ChangeEvent } from 'react';
+import { useState, useRef, useEffect, useContext } from 'react';
 import { addToast } from '@heroui/react';
-import { TokenContext } from '@/utils/TokenProvider';
-import { createCase } from '@/utils/caseControl';
 import { CasesMessages, CaseType } from '@/types/case';
-import CaseDialog from './CaseDialog';
-import CaseImportDialog from './CaseImportDialog';
-import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
-import ArboristTree from '@/src/app/[locale]/projects/[projectId]/folders/ArboristTree';
-import CaseEditor from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/[caseId]/CaseEditor';
+import { FilterOptions } from '@/types/filter';
+import { LocaleCodeType } from '@/types/locale';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
-import { LocaleCodeType } from '@/types/locale';
-import { Search } from 'lucide-react';
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
+import ArboristTree from '@/src/app/[locale]/projects/[projectId]/folders/ArboristTree';
+import AdvancedFilterInput from '@/src/app/[locale]/projects/[projectId]/folders/components/AdvancedFilterInput';
+import { createCase } from '@/utils/caseControl';
+import { TokenContext } from '@/utils/TokenProvider';
+import CaseDialog from './CaseDialog';
+import CaseEditor from './[caseId]/CaseEditor';
+import CaseImportDialog from './CaseImportDialog';
 
 type Props = {
   projectId: string;
@@ -23,14 +24,13 @@ type Props = {
   locale: LocaleCodeType;
 };
 
-export default function CasesPane({ projectId, messages }: Props) {
+export default function CasesPane({ projectId, messages, priorityMessages, testTypeMessages }: Props) {
   const context = useContext(TokenContext);
 
   const [isCaseDialogOpen, setIsCaseDialogOpen] = useState(false);
   const [currentFolderId, setCurrentFolderId] = useState<number | undefined>(undefined);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
-  const [deleteCaseIds, setDeleteCaseIds] = useState<number[]>([]);
   const [selectedCase, setSelectedCase] = useState<CaseType | null>(null);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -38,18 +38,7 @@ export default function CasesPane({ projectId, messages }: Props) {
   const [isResizing, setIsResizing] = useState(false);
   const [filteredCount, setFilteredCount] = useState(0);
 
-  const [filterInput, setFilterInput] = useState('');
-  const [appliedFilter, setAppliedFilter] = useState('');
-
-  const handleFilterChange = (e: ChangeEvent<HTMLInputElement>) => {
-    setFilterInput(e.target.value);
-  };
-
-  useEffect(() => {
-    if (filterInput === '') {
-      setAppliedFilter('');
-    }
-  }, [filterInput]);
+  const [currentFilter, setCurrentFilter] = useState<FilterOptions>({});
 
   // --- Resizable Split ---
   useEffect(() => {
@@ -90,14 +79,13 @@ export default function CasesPane({ projectId, messages }: Props) {
   }, [isResizing]);
 
   const handleCreateCase = async (title: string, description: string, folderId?: number, createMore?: boolean) => {
-    const newCase = await createCase(context.token.access_token, String(folderId), title, description);
+    await createCase(context.token.access_token, String(folderId), title, description);
     addToast({ title: 'Success', color: 'success', description: `Case "${title}" created` });
     if (!createMore) setIsCaseDialogOpen(false);
   };
 
   const closeDeleteConfirmDialog = () => {
     setIsDeleteConfirmDialogOpen(false);
-    setDeleteCaseIds([]);
   };
 
   const [updatedCase, setUpdatedCase] = useState<CaseType | undefined>(undefined);
@@ -128,33 +116,15 @@ export default function CasesPane({ projectId, messages }: Props) {
           }}
         >
           {/* Фильтр по кейсам */}
-          <div style={{ marginBottom: 8, display: 'flex', gap: 8 }}>
-            <input
-              type="text"
-              placeholder="Search or filter"
-              value={filterInput}
-              onChange={handleFilterChange}
-              className="
-                flex-1
-                px-2 py-1
-                rounded
-                border
-                border-gray-300 dark:border-gray-600
-                bg-transparent
-                text-gray-900 dark:text-gray-100
-                placeholder-gray-400 dark:placeholder-gray-500
-                outline-none
-                focus:outline-none
-                focus:ring-0
-                focus:ring-transparent
-              "
+          <div style={{ marginBottom: 8 }}>
+            <AdvancedFilterInput
+              projectId={projectId}
+              value={currentFilter}
+              onChange={setCurrentFilter}
+              priorityMessages={priorityMessages}
+              testTypeMessages={testTypeMessages}
+              placeholder="Search or add filter..."
             />
-            <button
-              onClick={() => setAppliedFilter(filterInput)}
-              style={{ padding: '4px 12px', borderRadius: 4, border: '1px solid var(--border-color)' }}
-            >
-              <Search size={16} strokeWidth={1.5} />
-            </button>
           </div>
 
           <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)' }}>
@@ -164,7 +134,7 @@ export default function CasesPane({ projectId, messages }: Props) {
           <ArboristTree
             projectId={projectId}
             messages={messages}
-            filter={appliedFilter}
+            filter={currentFilter}
             onFilterCount={(count) => setFilteredCount(count)}
             selectedCaseId={selectedCase?.id}
             onCaseClick={(caseData: CaseType) => setSelectedCase(caseData)}

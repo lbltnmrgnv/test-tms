@@ -1,10 +1,10 @@
 import { Button } from '@heroui/react';
 import { ChevronDown, ChevronRight, Folder, Plus } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { FolderType, FoldersMessages, TreeNodeData } from '@/types/folder';
+import TreeItem from '@/components/TreeItem';
 import { useRouter } from '@/src/i18n/routing';
 import FolderEditMenu from './FolderEditMenu';
-import TreeItem from '@/components/TreeItem';
-import { FolderType, FoldersMessages, TreeNodeData } from '@/types/folder';
 
 interface FolderItemProps {
   node: TreeNodeData;

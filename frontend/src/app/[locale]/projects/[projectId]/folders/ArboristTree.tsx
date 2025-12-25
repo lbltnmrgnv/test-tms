@@ -1,13 +1,14 @@
 'use client';
-import { Tree, NodeApi } from 'react-arborist';
 import { useState, useEffect, useContext, useRef } from 'react';
-import { TokenContext } from '@/utils/TokenProvider';
-import { fetchFolders, createFolder } from './foldersControl';
-import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount } from '@/utils/caseControl';
-import { FolderType } from '@/types/folder';
-import { CaseType, CasesMessages } from '@/types/case';
+import { Tree, NodeApi } from 'react-arborist';
 import { Folder, ChevronRight, ChevronDown, Bot, Hand, Plus } from 'lucide-react';
+import { CaseType, CasesMessages } from '@/types/case';
+import { FilterOptions } from '@/types/filter';
+import { FolderType } from '@/types/folder';
 import CaseDialog from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/CaseMoveDialog';
+import { TokenContext } from '@/utils/TokenProvider';
+import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount } from '@/utils/caseControl';
+import { fetchFolders, createFolder } from './foldersControl';
 
 type CreateMode = 'folder' | 'case';
 
@@ -33,7 +34,7 @@ interface Props {
   selectedCaseId?: number;
   onCaseClick?: (caseData: CaseType) => void;
   onCaseUpdated?: (updatedCase: CaseType) => void;
-  filter?: string;
+  filter?: FilterOptions;
   onFilterCount?: (count: number) => void;
   updatedCase?: CaseType; // внешнее обновление из редактора
 }
@@ -44,7 +45,7 @@ export default function ArboristTree({
   selectedCaseId,
   onCaseClick,
   onCaseUpdated,
-  filter = '',
+  filter = {},
   onFilterCount,
   updatedCase,
 }: Props) {
@@ -52,6 +53,16 @@ export default function ArboristTree({
   const [treeData, setTreeData] = useState<NodeData[]>([]);
   const [allFolders, setAllFolders] = useState<FolderType[]>([]);
   const nodesMapRef = useRef<Record<number, NodeApi<NodeData>>>({});
+
+  // Проверка, является ли фильтр пустым
+  const isFilterEmpty = (filter: FilterOptions): boolean => {
+    return (
+      !filter.search?.trim() &&
+      (!filter.priorities || filter.priorities.length === 0) &&
+      (!filter.types || filter.types.length === 0) &&
+      (!filter.tags || filter.tags.length === 0)
+    );
+  };
 
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [casesToMove, setCasesToMove] = useState<NodeData[]>([]);
@@ -64,15 +75,16 @@ export default function ArboristTree({
   // --- Размер дерева ---
   useEffect(() => {
     if (!treeContainerRef.current) return;
+    const container = treeContainerRef.current;
     const update = () => {
-      setTreeHeight(treeContainerRef.current!.offsetHeight);
-      setTreeWidth(treeContainerRef.current!.offsetWidth);
+      setTreeHeight(container.offsetHeight);
+      setTreeWidth(container.offsetWidth);
     };
     requestAnimationFrame(update);
 
     // Используем ResizeObserver для отслеживания изменений размера контейнера
     const resizeObserver = new ResizeObserver(update);
-    resizeObserver.observe(treeContainerRef.current);
+    resizeObserver.observe(container);
 
     window.addEventListener('resize', update);
     return () => {
@@ -154,57 +166,6 @@ export default function ArboristTree({
     setTreeData((prev) => updateNodes(prev));
   };
 
-  // --- Перезагрузка папки после создания ---
-  const reloadFolder = async (folderId: number) => {
-
-    const subFolders = allFolders.filter((f) => f.parentFolderId === folderId);
-    const fetchedCases = await fetchCases(ctx.token.access_token, Number(folderId));
-
-    const newChildren: NodeData[] = [
-      ...subFolders.map((f) => ({
-        id: `folder-${f.id}`,
-        name: f.name,
-        children: [],
-        folderId: f.id,
-        parentFolderId: f.parentFolderId,
-        loaded: false,
-        checked: false,
-        indeterminate: false,
-        open: false,
-      })),
-
-      ...fetchedCases.map((c: CaseType) => ({
-        id: `case-${c.id}`,
-        name: c.title,
-        isCase: true,
-        caseData: c,
-        folderId: folderId,
-        children: [],
-        loaded: true,
-      })),
-
-      // Добавляем создающий узел в конец
-      {
-        id: `create-${folderId}`,
-        name: 'New Folder',
-        isCreateNode: true,
-        createParentId: folderId,
-        children: [],
-        loaded: true,
-      },
-    ];
-
-
-    const updateTree = (nodes: NodeData[]): NodeData[] =>
-      nodes.map((n) => {
-        if (n.folderId === folderId) {
-          return { ...n, children: newChildren, loaded: true };
-        }
-        return { ...n, children: updateTree(n.children) };
-      });
-
-    setTreeData((prev) => updateTree(prev));
-  };
 
   // --- Добавление узла в дерево локально (без перезагрузки) ---
   const addNodeToParent = (parentFolderId: number, newNode: NodeData) => {
@@ -298,21 +259,23 @@ export default function ArboristTree({
 
   const handleMoved = async () => {
     if (!targetFolderId) return;
-    const caseIds = casesToMove.map((c) => c.caseData!.id);
+    const caseIds = casesToMove.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined);
     const success = await moveCases(ctx.token.access_token, caseIds, targetFolderId, Number(projectId));
     if (!success) return;
 
-    const movedCases = casesToMove.map((c) => ({
-      ...c,
-      folderId: targetFolderId,
-      id: `case-${c.caseData!.id}`,
-      name: c.caseData!.title,
-      isCase: true,
-      children: [],
-      loaded: true,
-      checked: false,
-      indeterminate: false,
-    }));
+    const movedCases = casesToMove
+      .filter((c) => c.caseData)
+      .map((c) => ({
+        ...c,
+        folderId: targetFolderId,
+        id: `case-${c.caseData?.id}`,
+        name: c.caseData?.title || '',
+        isCase: true,
+        children: [],
+        loaded: true,
+        checked: false,
+        indeterminate: false,
+      }));
 
     const removeNodes = (nodes: NodeData[]): NodeData[] =>
       nodes
@@ -353,7 +316,6 @@ export default function ArboristTree({
     const [mode, setMode] = useState<CreateMode>('folder');
     const [value, setValue] = useState('');
     const [isHovered, setIsHovered] = useState(false);
-    const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -470,7 +432,6 @@ export default function ArboristTree({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onClick={(e) => e.stopPropagation()}
-          onFocus={() => setIsFocused(true)}
           onBlur={(e) => {
             // Проверяем, что фокус ушел за пределы контейнера
             const relatedTarget = e.relatedTarget as Node | null;
@@ -483,7 +444,6 @@ export default function ArboristTree({
               setValue('');
               setMode('folder');
             }
-            setIsFocused(false);
           }}
           placeholder={mode === 'folder' ? 'Folder' : 'Test Case'}
           className="create-node-input"
@@ -523,7 +483,7 @@ export default function ArboristTree({
   // --- Подсчет общего количества кейсов ---
   useEffect(() => {
     if (!ctx.isSignedIn()) return; // Ждем авторизации
-    if (filter.trim()) return; // Если фильтр применен, не считаем (счет делается в loadFilteredTree)
+    if (!isFilterEmpty(filter)) return; // Если фильтр применен, не считаем (счет делается в loadFilteredTree)
 
     const loadTotalCaseCount = async () => {
       const count = await fetchCasesCount(ctx.token.access_token, Number(projectId));
@@ -550,7 +510,7 @@ export default function ArboristTree({
 
   // --- Фильтрация только при trigger ---
   useEffect(() => {
-    if (!filter.trim()) {
+    if (isFilterEmpty(filter)) {
       // --- сброс к исходному дереву ---
       const loadFullTree = async () => {
         // сначала корневые папки
@@ -588,7 +548,14 @@ export default function ArboristTree({
     }
 
     const loadFilteredTree = async () => {
-      const cases: CaseType[] = await searchCases(ctx.token.access_token, Number(projectId), filter);
+      const cases: CaseType[] = await searchCases(
+        ctx.token.access_token,
+        Number(projectId),
+        filter.search,
+        filter.priorities,
+        filter.types,
+        filter.tags
+      );
       onFilterCount?.(cases.length);
 
       const folderMap: Record<number, NodeData> = {};
@@ -655,7 +622,8 @@ export default function ArboristTree({
     };
 
     loadFilteredTree();
-  }, [filter]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, allFolders, ctx, projectId, onFilterCount]);
 
   return (
     <>
@@ -747,7 +715,7 @@ export default function ArboristTree({
       {isMoveDialogOpen && (
         <CaseDialog
           isOpen={isMoveDialogOpen}
-          testCaseIds={casesToMove.map((c) => c.caseData!.id)}
+          testCaseIds={casesToMove.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined)}
           projectId={projectId}
           targetFolderId={targetFolderId}
           isDisabled={!ctx.isProjectDeveloper(Number(projectId))}

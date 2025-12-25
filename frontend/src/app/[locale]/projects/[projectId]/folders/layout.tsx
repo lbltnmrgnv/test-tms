@@ -1,6 +1,3 @@
-import { useTranslations } from 'next-intl';
-// import FoldersPane from './FoldersPane';
-
 export default function FoldersLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex w-full h-full min-h-0 overflow-hidden">

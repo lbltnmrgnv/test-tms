@@ -3,17 +3,16 @@ import { useState, useEffect, useContext } from 'react';
 import { Button } from '@heroui/react';
 import { Plus } from 'lucide-react';
 import { Tree } from 'react-arborist';
-import FolderDialog from './FolderDialog';
-import FolderItem from './FolderItem';
-import { fetchFolders, createFolder, updateFolder, deleteFolder } from './foldersControl';
-import { usePathname, useRouter } from '@/src/i18n/routing';
+import { FolderType, FoldersMessages, TreeNodeData } from '@/types/folder';
+import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
+import { buildFolderTree } from '@/utils/buildFolderTree';
+import { logError } from '@/utils/errorHandler';
+import { emitMoveEvent } from '@/utils/testCaseMoveEvent';
 import { TokenContext } from '@/utils/TokenProvider';
 import useGetCurrentIds from '@/utils/useGetCurrentIds';
-import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
-import { FolderType, FoldersMessages, TreeNodeData } from '@/types/folder';
-import { logError } from '@/utils/errorHandler';
-import { buildFolderTree } from '@/utils/buildFolderTree';
-import { emitMoveEvent } from '@/utils/testCaseMoveEvent';
+import { usePathname, useRouter } from '@/src/i18n/routing';
+import FolderDialog from './FolderDialog';
+import { fetchFolders, createFolder, updateFolder, deleteFolder } from './foldersControl';
 
 
 type Props = {
@@ -27,7 +26,6 @@ export default function FoldersPane({ projectId, messages, locale }: Props) {
   const pathname = usePathname();
   const context = useContext(TokenContext);
   const [treeData, setTreeData] = useState<TreeNodeData[]>([]);
-  const [selectedFolder, setSelectedFolder] = useState<FolderType | null>(null);
   const { folderId } = useGetCurrentIds();
   const [isFolderDialogOpen, setIsFolderDialogOpen] = useState(false);
   const [editingFolder, setEditingFolder] = useState<FolderType | null>(null);
@@ -46,9 +44,6 @@ export default function FoldersPane({ projectId, messages, locale }: Props) {
         if (tree.length === 0) {
           return;
         }
-
-        const selectedFolderFromUrl = fetchedFolders.find((folder) => folder.id === folderId);
-        setSelectedFolder(selectedFolderFromUrl ? selectedFolderFromUrl : null);
 
         if (pathname === `/projects/${projectId}/folders`) {
           const smallestFolderId = Math.min(...fetchedFolders.map((folder) => folder.id));
@@ -86,23 +81,12 @@ export default function FoldersPane({ projectId, messages, locale }: Props) {
     closeDialog();
   };
 
-  const onEditClick = (folder: FolderType) => {
-    setEditingFolder(folder);
-    setParentFolderId(folder.parentFolderId);
-    setIsFolderDialogOpen(true);
-  };
-
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
   const [deleteFolderId, setDeleteFolderId] = useState<number | null>(null);
 
   const closeDeleteConfirmDialog = () => {
     setIsDeleteConfirmDialogOpen(false);
     setDeleteFolderId(null);
-  };
-
-  const onDeleteClick = (deleteFolderId: number) => {
-    setDeleteFolderId(deleteFolderId);
-    setIsDeleteConfirmDialogOpen(true);
   };
 
   const onConfirm = async () => {

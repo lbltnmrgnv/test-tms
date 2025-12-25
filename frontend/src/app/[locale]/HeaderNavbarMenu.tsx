@@ -17,7 +17,6 @@ import { ArrowRightFromLine, ArrowRightToLine, File, Globe, MoveUpRight, PenTool
 import DropdownAccount from './DropdownAccount';
 import DropdownLanguage from './DropdownLanguage';
 import { ThemeSwitch } from '@/components/ThemeSwitch';
-import { GithubIcon } from '@/components/icons';
 import { locales } from '@/config/selection';
 import { Link, useRouter } from '@/src/i18n/routing';
 import { TokenContext } from '@/utils/TokenProvider';

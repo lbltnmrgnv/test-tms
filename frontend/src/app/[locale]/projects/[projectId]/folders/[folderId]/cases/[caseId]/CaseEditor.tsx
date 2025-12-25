@@ -1,22 +1,21 @@
 'use client';
 import { useState, useEffect, useContext, ChangeEvent, DragEvent } from 'react';
-import { Input, Textarea, Select, SelectItem, Button, Divider, Tooltip, addToast, Badge } from '@heroui/react';
-import { Save, Plus, ArrowLeft, Circle } from 'lucide-react';
+import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge } from '@heroui/react';
+import { Save, Plus, Circle } from 'lucide-react';
 import CaseStepsEditor from './CaseStepsEditor';
 import CaseAttachmentsEditor from './CaseAttachmentsEditor';
 import { updateSteps } from './stepControl';
 import { fetchCreateAttachments, fetchDownloadAttachment, fetchDeleteAttachment } from './attachmentControl';
 import CaseTagsEditor from './CaseTagsEditor';
-import { fetchCase, updateCase } from '@/utils/caseControl';
-import { priorities, testTypes, templates } from '@/config/selection';
-import { useRouter } from '@/src/i18n/routing';
-import { TokenContext } from '@/utils/TokenProvider';
-import { useFormGuard } from '@/utils/formGuard';
 import { CaseType, AttachmentType, CaseMessages, StepType } from '@/types/case';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
+import { priorities, testTypes, templates } from '@/config/selection';
 import { logError } from '@/utils/errorHandler';
+import { fetchCase, updateCase } from '@/utils/caseControl';
 import { updateCaseTags } from '@/utils/caseTagsControls';
+import { useFormGuard } from '@/utils/formGuard';
+import { TokenContext } from '@/utils/TokenProvider';
 
 const defaultTestCase = {
   id: 0,
@@ -50,12 +49,10 @@ type Props = {
 
 export default function CaseEditor({
   projectId,
-  folderId,
   caseId,
   messages,
   testTypeMessages,
   priorityMessages,
-  locale,
   onUpdated,
 }: Props) {
   const tokenContext = useContext(TokenContext);
