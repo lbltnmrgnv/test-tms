@@ -198,6 +198,27 @@ export default function ArboristTree({
     setTreeData((prev) => updateTree(prev));
   };
 
+  // --- Добавление узла в дерево локально (без перезагрузки) ---
+  const addNodeToParent = (parentFolderId: number, newNode: NodeData) => {
+    const updateTree = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) => {
+        if (n.folderId === parentFolderId) {
+          // Находим create-node и вставляем новый узел перед ним
+          const createNodeIndex = n.children.findIndex((c) => c.isCreateNode);
+          const newChildren = [...n.children];
+          if (createNodeIndex !== -1) {
+            newChildren.splice(createNodeIndex, 0, newNode);
+          } else {
+            newChildren.push(newNode);
+          }
+          return { ...n, children: newChildren };
+        }
+        return { ...n, children: updateTree(n.children) };
+      });
+
+    setTreeData((prev) => updateTree(prev));
+  };
+
   // --- Клик по узлу ---
   const handleClick = async (node: NodeApi<NodeData>) => {
     if (node.data.isCase && node.data.caseData) {
@@ -326,6 +347,7 @@ export default function ArboristTree({
     const [isHovered, setIsHovered] = useState(false);
     const [isFocused, setIsFocused] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const handleModeSwitch = (newMode: CreateMode) => {
       setMode(newMode);
@@ -348,22 +370,48 @@ export default function ArboristTree({
 
         if (newFolder) {
           setAllFolders((prev) => [...prev, newFolder]);
+
+          // Добавляем папку локально в дерево
+          const folderNode: NodeData = {
+            id: `folder-${newFolder.id}`,
+            name: newFolder.name,
+            children: [],
+            folderId: newFolder.id,
+            parentFolderId: newFolder.parentFolderId,
+            loaded: false,
+            checked: false,
+            indeterminate: false,
+            open: false,
+          };
+          addNodeToParent(parentFolderId, folderNode);
         }
       } else {
         const newCase = await createCase(ctx.token.access_token, String(parentFolderId), trimmedValue, '');
 
-        if (newCase && onCaseClick) {
-          onCaseClick(newCase);
+        if (newCase) {
+          // Добавляем кейс локально в дерево
+          const caseNode: NodeData = {
+            id: `case-${newCase.id}`,
+            name: newCase.title,
+            isCase: true,
+            caseData: newCase,
+            folderId: parentFolderId,
+            children: [],
+            loaded: true,
+          };
+          addNodeToParent(parentFolderId, caseNode);
+
+          if (onCaseClick) {
+            onCaseClick(newCase);
+          }
         }
       }
 
       setValue('');
       setMode('folder');
-      await reloadFolder(parentFolderId);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
-
       e.stopPropagation();
 
       if (e.key === 'Enter') {
@@ -375,8 +423,14 @@ export default function ArboristTree({
       }
     };
 
+    const handleContainerClick = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      inputRef.current?.focus();
+    };
+
     return (
       <div
+        ref={containerRef}
         style={{
           ...style,
           display: 'flex',
@@ -391,6 +445,7 @@ export default function ArboristTree({
         className="tree-row create-node-row"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onClick={handleContainerClick}
       >
         <div className="icon-wrap">
           {mode === 'folder' ? (
@@ -406,8 +461,16 @@ export default function ArboristTree({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
+          onClick={(e) => e.stopPropagation()}
           onFocus={() => setIsFocused(true)}
-          onBlur={() => {
+          onBlur={(e) => {
+            // Проверяем, что фокус ушел за пределы контейнера
+            const relatedTarget = e.relatedTarget as Node | null;
+            if (relatedTarget && containerRef.current?.contains(relatedTarget)) {
+              // Фокус остался внутри контейнера, не сбрасываем
+              return;
+            }
+
             if (!value.trim()) {
               setValue('');
               setMode('folder');
@@ -595,6 +658,7 @@ export default function ArboristTree({
             onMove={handleMove}
             disableDrag={(node) => !node.isCase || node.isCreateNode === true}
             disableDrop={({ parentNode }) => !parentNode?.data.folderId}
+            disableEdit={true}
           >
             {({ node, style, dragHandle }) => {
               if (node.data.isCase && node.data.caseData) {
