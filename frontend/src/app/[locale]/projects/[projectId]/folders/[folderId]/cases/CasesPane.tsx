@@ -158,7 +158,7 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
         />
 
         {/* ПРАВАЯ ПАНЕЛЬ */}
-        <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           {selectedCase ? (
             <CaseEditor
               projectId={projectId}

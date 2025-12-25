@@ -233,8 +233,25 @@ export default function CaseEditor({
   }, [tokenContext, caseId]);
 
   return (
-    <>
-      <div className="border-b-1 dark:border-neutral-700 w-full p-3 flex items-center justify-end">
+    <div
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        minHeight: 0,
+      }}
+    >
+      {/* Fixed Header */}
+      <div className="border-b-1 dark:border-neutral-700 w-full p-3 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">
+            Test Case #{testCase.id}:
+          </span>
+          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
+            {testCase.title || 'Untitled'}
+          </span>
+        </div>
         <div className="flex items-center">
           <Button
             startContent={
@@ -281,7 +298,15 @@ export default function CaseEditor({
         </div>
       </div>
 
-      <div className="p-5">
+      {/* Scrollable Content */}
+      <div
+        className="p-5"
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+        }}
+      >
         <h6 className="font-bold">{messages.basic}</h6>
         <Input
           size="sm"
@@ -457,6 +482,6 @@ export default function CaseEditor({
           />
         )}
       </div>
-    </>
+    </div>
   );
 }
