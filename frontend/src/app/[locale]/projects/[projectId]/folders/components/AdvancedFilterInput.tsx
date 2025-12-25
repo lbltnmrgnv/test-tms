@@ -161,21 +161,6 @@ export default function AdvancedFilterInput({
   const renderMainDropdown = () => {
     if (!isMainDropdownOpen) return null;
 
-    const mainDropdownStyle: React.CSSProperties = {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      marginTop: 4,
-      zIndex: 1000,
-      backgroundColor: 'var(--nextui-default-50, #fafafa)',
-      border: '1px solid var(--nextui-default-200, #e4e4e7)',
-      borderRadius: 8,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      minWidth: 200,
-      padding: 4,
-      color: 'var(--nextui-foreground, #11181C)',
-    };
-
     const handleFilterTypeClick = (filterType: FilterType) => {
       setIncompleteChip(filterType);
       setActiveFilterType(filterType);
@@ -183,70 +168,22 @@ export default function AdvancedFilterInput({
     };
 
     return (
-      <div style={mainDropdownStyle}>
+      <div className="filter-dropdown">
         <button
           onClick={() => handleFilterTypeClick('priority')}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: '8px 12px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            borderRadius: 4,
-            textAlign: 'left',
-            color: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--nextui-default-100, #f4f4f5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
+          className="filter-dropdown-button"
         >
           Priority
         </button>
         <button
           onClick={() => handleFilterTypeClick('type')}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: '8px 12px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            borderRadius: 4,
-            textAlign: 'left',
-            color: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--nextui-default-100, #f4f4f5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
+          className="filter-dropdown-button"
         >
           Type
         </button>
         <button
           onClick={() => handleFilterTypeClick('tag')}
-          style={{
-            display: 'block',
-            width: '100%',
-            padding: '8px 12px',
-            border: 'none',
-            background: 'transparent',
-            cursor: 'pointer',
-            borderRadius: 4,
-            textAlign: 'left',
-            color: 'inherit',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--nextui-default-100, #f4f4f5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-          }}
+          className="filter-dropdown-button"
         >
           Tags
         </button>
@@ -258,48 +195,16 @@ export default function AdvancedFilterInput({
   const renderSecondaryDropdown = () => {
     if (!activeFilterType) return null;
 
-    const containerStyle: React.CSSProperties = {
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      marginTop: 4,
-      zIndex: 1000,
-      backgroundColor: 'var(--nextui-default-50, #fafafa)',
-      border: '1px solid var(--nextui-default-200, #e4e4e7)',
-      borderRadius: 8,
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      minWidth: 200,
-      color: 'var(--nextui-foreground, #11181C)',
-    };
-
     switch (activeFilterType) {
       case 'priority': {
         return (
-          <div style={containerStyle}>
+          <div className="filter-dropdown-secondary">
             <div style={{ padding: 8 }}>
               {priorities.map((p, idx) => (
                 <button
                   key={idx}
                   onClick={() => addChip('priority', `Priority|${priorityMessages?.[p.uid] ?? p.uid}`, idx)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    borderRadius: 4,
-                    textAlign: 'left',
-                    color: 'inherit',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'hsl(var(--nextui-default-100))';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
+                  className="filter-dropdown-button-flex"
                 >
                   <Circle size={8} color={p.color} fill={p.color} />
                   <span>{priorityMessages?.[p.uid]}</span>
@@ -312,29 +217,13 @@ export default function AdvancedFilterInput({
 
       case 'type': {
         return (
-          <div style={containerStyle}>
+          <div className="filter-dropdown-secondary">
             <div style={{ padding: 8, maxHeight: 300, overflowY: 'auto' }}>
               {testTypes.map((t, idx) => (
                 <button
                   key={idx}
                   onClick={() => addChip('type', `Type|${testTypeMessages?.[t.uid] ?? t.uid}`, idx)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    padding: '8px 12px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    borderRadius: 4,
-                    textAlign: 'left',
-                    color: 'inherit',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'hsl(var(--nextui-default-100))';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'transparent';
-                  }}
+                  className="filter-dropdown-button"
                 >
                   {testTypeMessages?.[t.uid]}
                 </button>
@@ -350,7 +239,7 @@ export default function AdvancedFilterInput({
         );
 
         return (
-          <div style={containerStyle}>
+          <div className="filter-dropdown-secondary">
             <div style={{ padding: 8 }}>
               <input
                 type="text"
@@ -358,20 +247,11 @@ export default function AdvancedFilterInput({
                 onChange={(e) => setTagSearchInput(e.target.value)}
                 placeholder="Search tags..."
                 autoFocus
-                style={{
-                  width: '100%',
-                  padding: '6px 8px',
-                  border: '1px solid var(--nextui-default-300, #d4d4d8)',
-                  borderRadius: 4,
-                  marginBottom: 8,
-                  background: 'transparent',
-                  outline: 'none',
-                  color: 'inherit',
-                }}
+                className="filter-tag-search-input"
               />
               <div style={{ maxHeight: 250, overflowY: 'auto' }}>
                 {filteredTags.length === 0 ? (
-                  <div style={{ padding: '8px 12px', color: 'var(--muted-color)', fontSize: 14 }}>
+                  <div style={{ padding: '8px 12px', opacity: 0.6, fontSize: 14 }}>
                     No tags found
                   </div>
                 ) : (
@@ -382,23 +262,7 @@ export default function AdvancedFilterInput({
                         addChip('tag', `Tag|${tag.name}`, tag.id);
                         setTagSearchInput('');
                       }}
-                      style={{
-                        display: 'block',
-                        width: '100%',
-                        padding: '8px 12px',
-                        border: 'none',
-                        background: 'transparent',
-                        cursor: 'pointer',
-                        borderRadius: 4,
-                        textAlign: 'left',
-                        color: 'inherit',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'hsl(var(--nextui-default-100))';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'transparent';
-                      }}
+                      className="filter-dropdown-button"
                     >
                       {tag.name}
                     </button>
@@ -420,14 +284,7 @@ export default function AdvancedFilterInput({
       {/* Overlay для закрытия dropdown'ов */}
       {(isMainDropdownOpen || activeFilterType) && (
         <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999,
-          }}
+          className="filter-overlay"
           onClick={() => {
             setIsMainDropdownOpen(false);
             setActiveFilterType(null);
@@ -438,18 +295,7 @@ export default function AdvancedFilterInput({
       )}
 
       <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          padding: '4px 8px',
-          border: '1px solid var(--nextui-default-300, #d4d4d8)',
-          borderRadius: 8,
-          minHeight: 40,
-          flexWrap: 'wrap',
-          cursor: 'text',
-          background: 'transparent',
-        }}
+        className="filter-input-container"
         onClick={() => {
           inputRef.current?.focus();
           setIsMainDropdownOpen(true);
@@ -466,17 +312,7 @@ export default function AdvancedFilterInput({
               <div
                 key={chip.id}
                 onClick={(e) => handleChipClick(chip, e)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  backgroundColor: 'var(--nextui-default-100, #f4f4f5)',
-                  borderRadius: 6,
-                  fontSize: 12,
-                  height: 24,
-                  cursor: chip.type !== 'text' ? 'pointer' : 'default',
-                  overflow: 'hidden',
-                  color: 'var(--nextui-foreground, #11181C)',
-                }}
+                className={`filter-chip ${chip.type !== 'text' ? 'filter-chip-clickable' : 'filter-chip-non-clickable'}`}
               >
                 {isTextSearch ? (
                   <>
@@ -492,11 +328,7 @@ export default function AdvancedFilterInput({
                     <span style={{ padding: '0 8px', fontWeight: 500 }}>
                       {parts[0]}
                     </span>
-                    <div style={{
-                      width: 1,
-                      height: '100%',
-                      backgroundColor: 'hsl(var(--nextui-default-300))'
-                    }} />
+                    <div className="filter-chip-divider" />
                     <span style={{ padding: '0 8px' }}>
                       {parts[1]}
                     </span>
@@ -511,17 +343,7 @@ export default function AdvancedFilterInput({
                     e.stopPropagation();
                     removeChip(chip.id);
                   }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 4px',
-                    border: 'none',
-                    background: 'transparent',
-                    cursor: 'pointer',
-                    height: '100%',
-                    color: 'inherit',
-                  }}
+                  className="filter-chip-remove-btn"
                   aria-label="Remove filter"
                 >
                   <X size={12} />
@@ -532,28 +354,13 @@ export default function AdvancedFilterInput({
 
           {/* Incomplete chip when filter type is selected but value is not yet chosen */}
           {incompleteChip && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                backgroundColor: 'hsl(var(--nextui-default-100))',
-                borderRadius: 6,
-                fontSize: 12,
-                height: 24,
-                overflow: 'hidden',
-                color: 'hsl(var(--nextui-foreground))',
-              }}
-            >
+            <div className="filter-chip">
               <span style={{ padding: '0 8px', fontWeight: 500 }}>
                 {incompleteChip === 'priority' && 'Priority'}
                 {incompleteChip === 'type' && 'Type'}
                 {incompleteChip === 'tag' && 'Tag'}
               </span>
-              <div style={{
-                width: 1,
-                height: '100%',
-                backgroundColor: 'hsl(var(--nextui-default-300))'
-              }} />
+              <div className="filter-chip-divider" />
               <span style={{ padding: '0 8px', opacity: 0.5 }}>
                 ...
               </span>
@@ -569,15 +376,7 @@ export default function AdvancedFilterInput({
           onKeyDown={handleKeyDown}
           onFocus={() => setIsMainDropdownOpen(true)}
           placeholder={chips.length === 0 && !incompleteChip ? placeholder : ''}
-          style={{
-            flex: 1,
-            minWidth: 120,
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            fontSize: 14,
-            color: 'inherit',
-          }}
+          className="filter-main-input"
         />
 
         {/* Clear button */}
@@ -587,15 +386,7 @@ export default function AdvancedFilterInput({
               e.stopPropagation();
               clearAllFilters();
             }}
-            style={{
-              padding: 4,
-              border: 'none',
-              background: 'transparent',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: 'var(--muted-color)',
-            }}
+            className="filter-clear-btn"
             aria-label="Clear all filters"
           >
             <X size={16} />
