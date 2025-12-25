@@ -147,7 +147,6 @@ export default function CasesPane({ projectId, messages }: Props) {
                 focus:outline-none
                 focus:ring-0
                 focus:ring-transparent
-                focus:border-blue-500 dark:focus:border-blue-400
               "
             />
             <button

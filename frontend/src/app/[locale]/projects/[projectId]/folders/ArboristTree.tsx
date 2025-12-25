@@ -69,8 +69,16 @@ export default function ArboristTree({
       setTreeWidth(treeContainerRef.current!.offsetWidth);
     };
     requestAnimationFrame(update);
+
+    // Используем ResizeObserver для отслеживания изменений размера контейнера
+    const resizeObserver = new ResizeObserver(update);
+    resizeObserver.observe(treeContainerRef.current);
+
     window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      resizeObserver.disconnect();
+    };
   }, []);
 
   // --- Загрузка папок ---
@@ -512,6 +520,19 @@ export default function ArboristTree({
     );
   };
 
+  // --- Подсчет общего количества кейсов ---
+  useEffect(() => {
+    if (filter.trim()) return; // Если фильтр применен, не считаем
+
+    const loadTotalCaseCount = async () => {
+      // Используем searchCases с пустой строкой чтобы получить все кейсы проекта
+      const allCases = await searchCases(ctx.token.access_token, Number(projectId), '');
+      onFilterCount?.(allCases.length);
+    };
+
+    loadTotalCaseCount();
+  }, [filter, onFilterCount, ctx.token.access_token, projectId]);
+
   // --- Иконка кейса ---
   const renderCaseIcon = (caseData: CaseType) =>
     caseData.automationStatus === 1 ? <Bot size={16} strokeWidth={1.5} /> : <Hand size={16} strokeWidth={1.5} />;
@@ -562,7 +583,6 @@ export default function ArboristTree({
       };
 
       loadFullTree();
-      onFilterCount?.(0);
       return;
     }
 
