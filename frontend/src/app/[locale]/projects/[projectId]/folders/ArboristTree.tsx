@@ -3,7 +3,7 @@ import { Tree, NodeApi } from 'react-arborist';
 import { useState, useEffect, useContext, useRef } from 'react';
 import { TokenContext } from '@/utils/TokenProvider';
 import { fetchFolders, createFolder } from './foldersControl';
-import { fetchCases, moveCases, searchCases, createCase } from '@/utils/caseControl';
+import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount } from '@/utils/caseControl';
 import { FolderType } from '@/types/folder';
 import { CaseType, CasesMessages } from '@/types/case';
 import { Folder, ChevronRight, ChevronDown, Bot, Hand, Plus } from 'lucide-react';
@@ -522,16 +522,17 @@ export default function ArboristTree({
 
   // --- Подсчет общего количества кейсов ---
   useEffect(() => {
-    if (filter.trim()) return; // Если фильтр применен, не считаем
+    if (!ctx.isSignedIn()) return; // Ждем авторизации
+    if (filter.trim()) return; // Если фильтр применен, не считаем (счет делается в loadFilteredTree)
 
     const loadTotalCaseCount = async () => {
-      // Используем searchCases с пустой строкой чтобы получить все кейсы проекта
-      const allCases = await searchCases(ctx.token.access_token, Number(projectId), '');
-      onFilterCount?.(allCases.length);
+      const count = await fetchCasesCount(ctx.token.access_token, Number(projectId));
+      onFilterCount?.(count);
     };
 
     loadTotalCaseCount();
-  }, [filter, onFilterCount, ctx.token.access_token, projectId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter, ctx, projectId]);
 
   // --- Иконка кейса ---
   const renderCaseIcon = (caseData: CaseType) =>

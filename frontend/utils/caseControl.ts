@@ -26,6 +26,27 @@ async function fetchCase(jwt: string, caseId: number) {
   }
 }
 
+async function fetchCasesCount(jwt: string, projectId: number) {
+  const url = `${apiServer}/cases/count?projectId=${projectId}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${jwt}`,
+      },
+    });
+
+    if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+    const data = await response.json();
+    return data.count || 0;
+  } catch (error: unknown) {
+    logError('Error fetching cases count', error);
+    return 0;
+  }
+}
+
 async function searchCases(
   jwt: string,
   projectId: number,
@@ -292,4 +313,4 @@ async function importCases(jwt: string, folderId: number, file: File) {
   }
 }
 
-export { fetchCase, fetchCases, updateCase, createCase, deleteCases, cloneCases, exportCases, importCases, searchCases };
+export { fetchCase, fetchCases, fetchCasesCount, updateCase, createCase, deleteCases, cloneCases, exportCases, importCases, searchCases };

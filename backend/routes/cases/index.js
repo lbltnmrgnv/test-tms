@@ -95,6 +95,30 @@ export default function (sequelize) {
     }
   });
 
+  router.get('/count', verifySignedIn, verifyProjectVisibleFromProjectId, async (req, res) => {
+    const { projectId } = req.query;
+
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId is required' });
+    }
+
+    try {
+      const folders = await Folder.findAll({ where: { projectId } });
+      const folderIds = folders.map(f => f.id);
+
+      if (!folderIds.length) return res.json({ count: 0 });
+
+      const count = await Case.count({
+        where: { folderId: { [Op.in]: folderIds } },
+      });
+
+      res.json({ count });
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
+
   router.get('/search', verifySignedIn, verifyProjectVisibleFromProjectId, async (req, res) => {
     const { projectId, search, priority, type, tag } = req.query;
 
