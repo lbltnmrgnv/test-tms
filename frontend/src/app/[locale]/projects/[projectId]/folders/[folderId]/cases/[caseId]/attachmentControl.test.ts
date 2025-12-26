@@ -5,6 +5,8 @@ import { AttachmentType } from '@/types/case';
 describe('attachment control', () => {
   test('isImage', () => {
     type CaseAttachmentType = {
+      caseId: number;
+      attachmentId: number;
       createdAt: Date;
       updatedAt: Date;
       CaseId: number;
@@ -12,6 +14,8 @@ describe('attachment control', () => {
     };
 
     const sampleCaseAttachment: CaseAttachmentType = {
+      caseId: 1,
+      attachmentId: 1,
       createdAt: new Date(),
       updatedAt: new Date(),
       CaseId: 1,

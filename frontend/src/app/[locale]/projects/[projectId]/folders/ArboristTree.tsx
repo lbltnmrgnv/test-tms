@@ -5,13 +5,14 @@
 import { useState, useEffect, useContext, useRef } from 'react';
 import { Tree, NodeApi } from 'react-arborist';
 import { Folder, ChevronRight, ChevronDown, Bot, Hand, Plus } from 'lucide-react';
+import { addToast } from '@heroui/react';
 import { CaseType, CasesMessages } from '@/types/case';
 import { FilterOptions } from '@/types/filter';
 import { FolderType } from '@/types/folder';
 import CaseDialog from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/CaseMoveDialog';
 import { TokenContext } from '@/utils/TokenProvider';
-import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount } from '@/utils/caseControl';
-import { fetchFolders, createFolder } from './foldersControl';
+import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount, deleteCases, updateCase, fetchCasesRecursive } from '@/utils/caseControl';
+import { fetchFolders, createFolder, deleteFolder, updateFolder } from './foldersControl';
 
 type CreateMode = 'folder' | 'case';
 
@@ -73,11 +74,23 @@ export default function ArboristTree({
 
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [casesToMove, setCasesToMove] = useState<NodeData[]>([]);
+  const [foldersToMove, setFoldersToMove] = useState<NodeData[]>([]);
   const [targetFolderId, setTargetFolderId] = useState<number | undefined>(undefined);
+  const [totalCasesInFolders, setTotalCasesInFolders] = useState<number>(0);
 
   const treeContainerRef = useRef<HTMLDivElement | null>(null);
   const [treeHeight, setTreeHeight] = useState<number>(0);
   const [treeWidth, setTreeWidth] = useState(0);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean;
+    x: number;
+    y: number;
+    node: NodeApi<NodeData> | null;
+  }>({ visible: false, x: 0, y: 0, node: null });
+  const [isRenaming, setIsRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
 
   // Tree dimensions
   useEffect(() => {
@@ -128,6 +141,9 @@ export default function ArboristTree({
     const subFolders = allFolders.filter((f) => f.parentFolderId === folder.folderId);
     const fetchedCases = await fetchCases(ctx.token.access_token, Number(folder.folderId));
 
+    // Determine if children should be automatically checked
+    const shouldAutoCheck = folder.checked || false;
+
     const children: NodeData[] = [
       ...subFolders.map((f) => ({
         id: `folder-${f.id}`,
@@ -136,7 +152,7 @@ export default function ArboristTree({
         folderId: f.id,
         parentFolderId: f.parentFolderId,
         loaded: false,
-        checked: false,
+        checked: shouldAutoCheck,
         indeterminate: false,
         open: false,
       })),
@@ -148,6 +164,7 @@ export default function ArboristTree({
         folderId: folder.folderId,
         children: [],
         loaded: true,
+        checked: shouldAutoCheck,
       })),
       // Add create node at the end
       {
@@ -173,7 +190,6 @@ export default function ArboristTree({
     setTreeData((prev) => updateNodes(prev));
   };
 
-
   // Add node to tree locally (without reload)
   const addNodeToParent = (parentFolderId: number, newNode: NodeData) => {
     const updateTree = (nodes: NodeData[]): NodeData[] =>
@@ -194,6 +210,191 @@ export default function ArboristTree({
 
     setTreeData((prev) => updateTree(prev));
   };
+
+  // Context menu handlers
+  const handleContextMenu = (e: React.MouseEvent, node: NodeApi<NodeData>) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // Don't show context menu for create nodes
+    if (node.data.isCreateNode) return;
+
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+      node,
+    });
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu({ visible: false, x: 0, y: 0, node: null });
+  };
+
+  const handleContextSelect = () => {
+    if (contextMenu.node) {
+      toggleCheck(contextMenu.node);
+    }
+    closeContextMenu();
+  };
+
+  const handleContextRename = () => {
+    if (contextMenu.node) {
+      setIsRenaming(contextMenu.node.data.id);
+      setRenameValue(contextMenu.node.data.name);
+    }
+    closeContextMenu();
+  };
+
+  const handleContextMove = async () => {
+    if (!contextMenu.node) return;
+
+    if (contextMenu.node.data.isCase) {
+      // Move case
+      setCasesToMove([contextMenu.node.data]);
+      setFoldersToMove([]);
+      setTotalCasesInFolders(0);
+      setTargetFolderId(undefined);
+      setIsMoveDialogOpen(true);
+    } else if (contextMenu.node.data.folderId) {
+      // Move folder
+      const folderId = contextMenu.node.data.folderId;
+      const recursiveCases = await fetchCasesRecursive(ctx.token.access_token, folderId);
+
+      setCasesToMove([]);
+      setFoldersToMove([contextMenu.node.data]);
+      setTotalCasesInFolders(recursiveCases.length);
+      setTargetFolderId(undefined);
+      setIsMoveDialogOpen(true);
+    }
+    closeContextMenu();
+  };
+
+  const handleContextDelete = async () => {
+    if (!contextMenu.node) return;
+
+    const node = contextMenu.node;
+    closeContextMenu();
+
+    try {
+      if (node.data.isCase && node.data.caseData) {
+        // Delete case
+        await deleteCases(ctx.token.access_token, [node.data.caseData.id], Number(projectId));
+
+        // Remove from tree
+        const removeNode = (nodes: NodeData[]): NodeData[] =>
+          nodes
+            .map((n) => ({ ...n, children: removeNode(n.children) }))
+            .filter((n) => n.id !== node.data.id);
+
+        setTreeData((prev) => removeNode(prev));
+      } else if (node.data.folderId) {
+        // Delete folder
+        await deleteFolder(ctx.token.access_token, node.data.folderId);
+
+        // Remove from tree and allFolders
+        const removeNode = (nodes: NodeData[]): NodeData[] =>
+          nodes
+            .map((n) => ({ ...n, children: removeNode(n.children) }))
+            .filter((n) => n.id !== node.data.id);
+
+        setTreeData((prev) => removeNode(prev));
+        setAllFolders((prev) => prev.filter((f) => f.id !== node.data.folderId));
+      }
+    } catch (error) {
+      console.error('Error deleting:', error);
+    }
+  };
+
+  const handleRenameSubmit = async () => {
+    if (!isRenaming || !renameValue.trim()) {
+      setIsRenaming(null);
+      return;
+    }
+
+    const nodeId = isRenaming;
+    const trimmedValue = renameValue.trim();
+
+    // Find the node in tree
+    const findNode = (nodes: NodeData[]): NodeData | null => {
+      for (const n of nodes) {
+        if (n.id === nodeId) return n;
+        const found = findNode(n.children);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const node = findNode(treeData);
+    if (!node) {
+      setIsRenaming(null);
+      return;
+    }
+
+    try {
+      if (node.isCase && node.caseData) {
+        // Update case title via API
+        const updatedCase = { ...node.caseData, title: trimmedValue };
+        await updateCase(ctx.token.access_token, updatedCase);
+
+        // Update in tree
+        const updateNode = (nodes: NodeData[]): NodeData[] =>
+          nodes.map((n) =>
+            n.id === nodeId
+              ? { ...n, name: trimmedValue, caseData: { ...n.caseData, title: trimmedValue } as CaseType }
+              : { ...n, children: updateNode(n.children) }
+          );
+
+        setTreeData((prev) => updateNode(prev));
+        onCaseUpdated?.(updatedCase);
+      } else if (node.folderId) {
+        // Update folder via API
+        await updateFolder(
+          ctx.token.access_token,
+          node.folderId,
+          trimmedValue,
+          '',
+          projectId,
+          node.parentFolderId ?? null
+        );
+
+        // Update in tree
+        const updateNode = (nodes: NodeData[]): NodeData[] =>
+          nodes.map((n) =>
+            n.id === nodeId ? { ...n, name: trimmedValue } : { ...n, children: updateNode(n.children) }
+          );
+
+        setTreeData((prev) => updateNode(prev));
+        setAllFolders((prev) =>
+          prev.map((f) => (f.id === node.folderId ? { ...f, name: trimmedValue } : f))
+        );
+      }
+    } catch (error) {
+      console.error('Error renaming:', error);
+    }
+
+    setIsRenaming(null);
+    setRenameValue('');
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      handleRenameSubmit();
+    } else if (e.key === 'Escape') {
+      setIsRenaming(null);
+      setRenameValue('');
+    }
+  };
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    if (contextMenu.visible) {
+      const handleClickOutside = () => closeContextMenu();
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu.visible]);
 
   // Node click handler
   const handleClick = async (node: NodeApi<NodeData>) => {
@@ -255,10 +456,10 @@ export default function ArboristTree({
   }, [updatedCase, onCaseUpdated]);
 
   // Checkboxes
-  const toggleCheck = (node: NodeApi<NodeData>) => {
+  const toggleCheck = async (node: NodeApi<NodeData>) => {
     const newState = !node.data.checked;
 
-    // Recursively update state of all child nodes
+    // Recursively update state of all loaded child nodes
     const updateChildren = (nodes: NodeData[], state: boolean): NodeData[] =>
       nodes.map((n) => ({
         ...n,
@@ -267,7 +468,7 @@ export default function ArboristTree({
         children: updateChildren(n.children, state),
       }));
 
-    // Apply update to target node and its children
+    // Apply update to target node and its loaded children
     const applyUpdate = (nodes: NodeData[]): NodeData[] =>
       nodes.map((n) => {
         if (n.id === node.data.id) {
@@ -278,6 +479,7 @@ export default function ArboristTree({
             children: updateChildren(n.children, newState),
           };
         }
+
         return {
           ...n,
           children: applyUpdate(n.children),
@@ -303,24 +505,154 @@ export default function ArboristTree({
       return nodes.map(process);
     };
 
-    setTreeData(updateParents(applyUpdate(treeData)));
+    setTreeData(prev => updateParents(applyUpdate(prev)));
+  };
+
+  // Helper function to check if a folder is a descendant of another folder
+  const isFolderDescendant = (folderId: number, potentialAncestorId: number): boolean => {
+    let currentFolder = allFolders.find((f) => f.id === folderId);
+    while (currentFolder) {
+      if (currentFolder.parentFolderId === potentialAncestorId) {
+        return true;
+      }
+      currentFolder = allFolders.find((f) => f.id === currentFolder?.parentFolderId);
+    }
+    return false;
   };
 
   // Drag & Drop
   const handleMove = async ({ dragIds, parentNode }: { dragIds: string[]; parentNode: NodeApi<NodeData> | null }) => {
     if (!parentNode?.data.folderId) return;
     const targetId = parentNode.data.folderId;
-    const getCheckedCases = (nodes: NodeData[]): NodeData[] => {
-      let result: NodeData[] = [];
-      for (const n of nodes) {
-        if (n.isCase && n.checked) result.push(n);
-        result = result.concat(getCheckedCases(n.children));
+
+    // Determine if dragging a folder or cases
+    const draggedNodes = dragIds.map((id) => {
+      if (id.startsWith('folder-')) {
+        const folderId = Number(id.replace('folder-', ''));
+        return { id, isFolder: true, folderId };
+      } else if (id.startsWith('case-')) {
+        const caseId = Number(id.replace('case-', ''));
+        return { id, isFolder: false, node: nodesMapRef.current[caseId]?.data };
       }
-      return result;
+      return null;
+    }).filter(Boolean);
+
+    // Check if any dragged item is a folder
+    const draggedFolder = draggedNodes.find((n) => n && n.isFolder);
+
+    if (draggedFolder) {
+      // Handle folder move
+      // Collect all checked folders
+      const getCheckedFolders = (nodes: NodeData[]): NodeData[] => {
+        let folders: NodeData[] = [];
+        for (const n of nodes) {
+          if (!n.isCase && n.checked && n.folderId) {
+            folders.push(n);
+          }
+          folders = folders.concat(getCheckedFolders(n.children));
+        }
+        return folders;
+      };
+
+      const checkedFolders = getCheckedFolders(treeData);
+      const foldersToMove = checkedFolders.length > 0 ? checkedFolders : [draggedNodes.find(n => n && n.isFolder && n.folderId)].map(n => {
+        if (!n) return null;
+        const findFolderNode = (nodes: NodeData[]): NodeData | null => {
+          for (const node of nodes) {
+            if (node.id === `folder-${n.folderId}`) return node;
+            const found = findFolderNode(node.children);
+            if (found) return found;
+          }
+          return null;
+        };
+        return findFolderNode(treeData);
+      }).filter((n): n is NodeData => n !== null);
+
+      // Validate all folders
+      for (const folder of foldersToMove) {
+        if (!folder.folderId) continue;
+
+        // Prevent dropping folder into itself
+        if (folder.folderId === targetId) {
+          console.warn('Cannot move folder into itself');
+          return;
+        }
+
+        // Prevent dropping folder into its own descendants
+        if (isFolderDescendant(targetId, folder.folderId)) {
+          console.warn('Cannot move folder into its own descendant');
+          return;
+        }
+      }
+
+      // Calculate total cases in all folders
+      let totalCases = 0;
+      for (const folder of foldersToMove) {
+        if (folder.folderId) {
+          const cases = await fetchCasesRecursive(ctx.token.access_token, folder.folderId);
+          totalCases += cases.length;
+        }
+      }
+
+      // Show dialog
+      setCasesToMove([]);
+      setFoldersToMove(foldersToMove);
+      setTotalCasesInFolders(totalCases);
+      setTargetFolderId(targetId);
+      setIsMoveDialogOpen(true);
+      return;
+    }
+
+    // Handle case move (existing logic)
+    // Helper to collect checked cases and identify checked but unloaded folders
+    const getCheckedCasesAndFolders = (nodes: NodeData[]): {
+      cases: NodeData[],
+      unloadedFolderIds: number[]
+    } => {
+      let cases: NodeData[] = [];
+      let unloadedFolderIds: number[] = [];
+
+      for (const n of nodes) {
+        if (n.isCase && n.checked) {
+          cases.push(n);
+        } else if (!n.isCase && n.checked && !n.loaded && n.folderId) {
+          // Folder is checked but not loaded - need to fetch its cases recursively
+          unloadedFolderIds.push(n.folderId);
+        }
+
+        // Recursively process children
+        const childResult = getCheckedCasesAndFolders(n.children);
+        cases = cases.concat(childResult.cases);
+        unloadedFolderIds = unloadedFolderIds.concat(childResult.unloadedFolderIds);
+      }
+
+      return { cases, unloadedFolderIds };
     };
-    const selectedCases = getCheckedCases(treeData);
+
+    const { cases: selectedCases, unloadedFolderIds } = getCheckedCasesAndFolders(treeData);
+
+    // Fetch cases from unloaded folders recursively
+    const recursiveCases: CaseType[] = [];
+    for (const folderId of unloadedFolderIds) {
+      const cases = await fetchCasesRecursive(ctx.token.access_token, folderId);
+      recursiveCases.push(...cases);
+    }
+
+    // Convert recursive cases to NodeData format
+    const recursiveNodes: NodeData[] = recursiveCases.map((c) => ({
+      id: `case-${c.id}`,
+      name: c.title,
+      isCase: true,
+      caseData: c,
+      folderId: c.folderId,
+      children: [],
+      loaded: true,
+      checked: true,
+    }));
+
     const dragCases = dragIds.map((id) => nodesMapRef.current[Number(id.replace('case-', ''))]?.data).filter(Boolean);
-    const finalCases = selectedCases.length ? selectedCases : dragCases;
+    const allSelectedCases = [...selectedCases, ...recursiveNodes];
+    const finalCases = allSelectedCases.length ? allSelectedCases : dragCases;
     if (!finalCases.length) return;
     setCasesToMove(finalCases);
     setTargetFolderId(targetId);
@@ -329,9 +661,140 @@ export default function ArboristTree({
 
   const handleMoved = async () => {
     if (!targetFolderId) return;
+
+    // Handle folder moves
+    if (foldersToMove.length > 0) {
+      try {
+        // Move all folders via API
+        for (const folderNode of foldersToMove) {
+          if (!folderNode.folderId) continue;
+
+          const folder = allFolders.find((f) => f.id === folderNode.folderId);
+          if (!folder) continue;
+
+          await updateFolder(
+            ctx.token.access_token,
+            folderNode.folderId,
+            folder.name,
+            folder.detail || '',
+            projectId,
+            targetFolderId
+          );
+        }
+
+        // Update allFolders state
+        const folderIds = foldersToMove.map(f => f.folderId).filter((id): id is number => id !== undefined);
+        setAllFolders((prev) =>
+          prev.map((f) => (folderIds.includes(f.id) ? { ...f, parentFolderId: targetFolderId } : f))
+        );
+
+        // Remove folders from old location in tree
+        const removeFolders = (nodes: NodeData[]): NodeData[] =>
+          nodes
+            .map((n) => ({ ...n, children: removeFolders(n.children) }))
+            .filter((n) => n.folderId !== undefined && !folderIds.includes(n.folderId));
+
+        // Find the target node in tree
+        const findTargetNode = (nodes: NodeData[]): NodeData | null => {
+          for (const n of nodes) {
+            if (n.folderId === targetFolderId) return n;
+            const found = findTargetNode(n.children);
+            if (found) return found;
+          }
+          return null;
+        };
+
+        const targetNode = findTargetNode(treeData);
+
+        // Add folders to new location in tree
+        const addToTargetFolder = (nodes: NodeData[]): NodeData[] =>
+          nodes.map((n) => {
+            if (n.folderId === targetFolderId) {
+              // Only update if target is loaded
+              if (!n.loaded) {
+                // Don't modify children for unloaded nodes
+                return n;
+              }
+
+              const createNodeIndex = n.children.findIndex((c) => c.isCreateNode);
+              const newFolders: NodeData[] = foldersToMove.map(folderNode => {
+                const folder = allFolders.find(f => f.id === folderNode.folderId);
+                return {
+                  id: `folder-${folderNode.folderId}`,
+                  name: folder?.name || folderNode.name,
+                  children: [],
+                  folderId: folderNode.folderId!,
+                  parentFolderId: targetFolderId,
+                  loaded: false,
+                  checked: false,
+                  indeterminate: false,
+                  open: false,
+                };
+              });
+
+              const newChildren = [...n.children];
+              if (createNodeIndex !== -1) {
+                newChildren.splice(createNodeIndex, 0, ...newFolders);
+              } else {
+                newChildren.push(...newFolders);
+              }
+
+              return { ...n, children: newChildren };
+            }
+            return { ...n, children: addToTargetFolder(n.children) };
+          });
+
+        // Only update tree if target is loaded
+        if (targetNode?.loaded) {
+          setTreeData((prev) => addToTargetFolder(removeFolders(prev)));
+        } else {
+          // Just remove from old location
+          setTreeData((prev) => removeFolders(prev));
+        }
+
+        // Uncheck all folders
+        const uncheckAll = (nodes: NodeData[]): NodeData[] =>
+          nodes.map((n) => ({
+            ...n,
+            checked: false,
+            indeterminate: false,
+            children: uncheckAll(n.children),
+          }));
+
+        setTreeData((prev) => uncheckAll(prev));
+      } catch (error) {
+        console.error('Error moving folders:', error);
+        addToast({
+          title: 'Error',
+          color: 'danger',
+          description: error instanceof Error ? error.message : 'Failed to move folders'
+        });
+        return;
+      }
+
+      addToast({
+        title: 'Success',
+        color: 'success',
+        description: 'Folders moved successfully'
+      });
+
+      setIsMoveDialogOpen(false);
+      setFoldersToMove([]);
+      setTotalCasesInFolders(0);
+      return;
+    }
+
+    // Handle case moves (existing logic)
     const caseIds = casesToMove.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined);
     const success = await moveCases(ctx.token.access_token, caseIds, targetFolderId, Number(projectId));
-    if (!success) return;
+    if (!success) {
+      addToast({
+        title: 'Error',
+        color: 'danger',
+        description: 'Failed to move test cases'
+      });
+      return;
+    }
 
     const movedCases = casesToMove
       .filter((c) => c.caseData)
@@ -370,7 +833,26 @@ export default function ArboristTree({
       });
 
     setTreeData((prev) => addToTargetFolder(removeNodes(prev)));
+
+    // Uncheck all cases
+    const uncheckAll = (nodes: NodeData[]): NodeData[] =>
+      nodes.map((n) => ({
+        ...n,
+        checked: false,
+        indeterminate: false,
+        children: uncheckAll(n.children),
+      }));
+
+    setTreeData((prev) => uncheckAll(prev));
+
+    addToast({
+      title: 'Success',
+      color: 'success',
+      description: messages.casesMoved
+    });
+
     setIsMoveDialogOpen(false);
+    setCasesToMove([]);
   };
 
   // Component for creating new items
@@ -755,7 +1237,7 @@ export default function ArboristTree({
             openByDefault={false}
             initialOpenState={initialOpenState}
             onMove={handleMove}
-            disableDrag={(node) => !node.isCase || node.isCreateNode === true}
+            disableDrag={(node) => node.isCreateNode === true}
             disableDrop={({ parentNode }) => !parentNode?.data.folderId}
             disableEdit={true}
           >
@@ -786,6 +1268,7 @@ export default function ArboristTree({
                   }}
                   className={`tree-row ${node.data.isCase && node.data.caseData?.id === selectedCaseId ? 'selected-case' : ''}`}
                   onClick={() => handleClick(node)}
+                  onContextMenu={(e) => handleContextMenu(e, node)}
                   ref={dragHandle}
                 >
                   <input
@@ -814,7 +1297,26 @@ export default function ArboristTree({
                       </>
                     )}
                   </div>
-                  <span className="title">{node.data.name}</span>
+                  {isRenaming === node.data.id ? (
+                    <input
+                      type="text"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={handleRenameKeyDown}
+                      onBlur={handleRenameSubmit}
+                      onClick={(e) => e.stopPropagation()}
+                      autoFocus
+                      className="title"
+                      style={{
+                        border: '1px solid #3b82f6',
+                        outline: 'none',
+                        padding: '0 4px',
+                        borderRadius: '2px',
+                      }}
+                    />
+                  ) : (
+                    <span className="title">{node.data.name}</span>
+                  )}
                 </div>
               );
             }}
@@ -826,14 +1328,47 @@ export default function ArboristTree({
         <CaseDialog
           isOpen={isMoveDialogOpen}
           testCaseIds={casesToMove.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined)}
+          foldersCount={foldersToMove.length}
+          totalCasesInFolders={totalCasesInFolders}
           projectId={projectId}
           targetFolderId={targetFolderId}
           isDisabled={!ctx.isProjectDeveloper(Number(projectId))}
-          onCancel={() => setIsMoveDialogOpen(false)}
+          onCancel={() => {
+            setIsMoveDialogOpen(false);
+            setCasesToMove([]);
+            setFoldersToMove([]);
+            setTotalCasesInFolders(0);
+          }}
           onMoved={handleMoved}
           messages={messages}
           token={ctx.token.access_token}
         />
+      )}
+
+      {contextMenu.visible && contextMenu.node && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 1000,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button className="context-menu-item" onClick={handleContextSelect}>
+            Select
+          </button>
+          <button className="context-menu-item" onClick={handleContextRename}>
+            Rename
+          </button>
+          <button className="context-menu-item" onClick={handleContextMove}>
+            Move
+          </button>
+          <button className="context-menu-item context-menu-item-danger" onClick={handleContextDelete}>
+            Delete
+          </button>
+        </div>
       )}
     </>
   );

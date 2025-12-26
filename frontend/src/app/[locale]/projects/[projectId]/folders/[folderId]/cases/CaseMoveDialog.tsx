@@ -3,11 +3,13 @@ import { useState } from 'react';
 import { Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner, addToast } from '@heroui/react';
 import { Copy, Forward } from 'lucide-react';
 import { CasesMessages } from '@/types/case';
-import { moveCases, cloneCases } from '@/utils/caseControl';
+import { cloneCases } from '@/utils/caseControl';
 
 type Props = {
   isOpen: boolean;
   testCaseIds: number[];
+  foldersCount?: number;
+  totalCasesInFolders?: number;
   projectId: string;
   targetFolderId?: number;
   isDisabled: boolean;
@@ -20,6 +22,8 @@ type Props = {
 export default function CaseDialog({
   isOpen,
   testCaseIds,
+  foldersCount = 0,
+  totalCasesInFolders = 0,
   projectId,
   targetFolderId,
   isDisabled,
@@ -36,20 +40,9 @@ export default function CaseDialog({
     }
 
     setIsProcessing(true);
-    const success = await moveCases(token, testCaseIds, targetFolderId, Number(projectId));
+    await onMoved();
     setIsProcessing(false);
-
-    if (success) {
-      addToast({
-        title: 'Success',
-        color: 'success',
-        description: messages.casesMoved,
-      });
-      onMoved();
-      onCancel();
-    } else {
-      console.error('Error moving cases');
-    }
+    onCancel();
   };
 
   const handleClone = async () => {
@@ -79,9 +72,20 @@ export default function CaseDialog({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">{messages.selectAction}</ModalHeader>
         <ModalBody>
-          <p>
-            {testCaseIds.length} {messages.casesSelected}
-          </p>
+          {foldersCount > 0 ? (
+            <div className="flex flex-col gap-2">
+              <p>
+                {foldersCount} {foldersCount === 1 ? 'folder' : 'folders'} selected
+              </p>
+              <p className="text-sm text-gray-600">
+                Total test cases in folders: {totalCasesInFolders}
+              </p>
+            </div>
+          ) : (
+            <p>
+              {testCaseIds.length} {messages.casesSelected}
+            </p>
+          )}
         </ModalBody>
         <ModalFooter>
           {isProcessing ? (
@@ -91,15 +95,17 @@ export default function CaseDialog({
               <Button variant="light" size="sm" onPress={onCancel}>
                 {messages.close}
               </Button>
-              <Button
-                color="primary"
-                size="sm"
-                onPress={handleClone}
-                startContent={<Copy size={16} />}
-                isDisabled={isDisabled}
-              >
-                {messages.clone}
-              </Button>
+              {foldersCount === 0 && (
+                <Button
+                  color="primary"
+                  size="sm"
+                  onPress={handleClone}
+                  startContent={<Copy size={16} />}
+                  isDisabled={isDisabled}
+                >
+                  {messages.clone}
+                </Button>
+              )}
               <Button
                 color="primary"
                 size="sm"

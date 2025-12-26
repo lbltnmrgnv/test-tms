@@ -313,4 +313,28 @@ async function importCases(jwt: string, folderId: number, file: File) {
   }
 }
 
+export async function fetchCasesRecursive(token: string, folderId: number): Promise<CaseType[]> {
+  const url = `${apiServer}/cases/recursive?folderId=${folderId}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! Status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data || [];
+  } catch (error: unknown) {
+    logError('Error fetching recursive cases', error);
+    return [];
+  }
+}
+
 export { fetchCase, fetchCases, fetchCasesCount, updateCase, createCase, deleteCases, cloneCases, exportCases, importCases, searchCases };

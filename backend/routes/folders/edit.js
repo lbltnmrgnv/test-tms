@@ -10,6 +10,24 @@ export default function (sequelize) {
   const { verifyProjectDeveloperFromFolderId } = editableMiddleware(sequelize);
   const Folder = defineFolder(sequelize, DataTypes);
 
+  // Recursive function to check if targetId is a descendant of folderId
+  async function isDescendant(folderId, targetId) {
+    if (!targetId) {
+      return false;
+    }
+
+    if (folderId === targetId) {
+      return true;
+    }
+
+    const targetFolder = await Folder.findByPk(targetId);
+    if (!targetFolder || !targetFolder.parentFolderId) {
+      return false;
+    }
+
+    return isDescendant(folderId, targetFolder.parentFolderId);
+  }
+
   router.put('/:folderId', verifySignedIn, verifyProjectDeveloperFromFolderId, async (req, res) => {
     const folderId = req.params.folderId;
     const { name, detail, projectId, parentFolderId } = req.body;
@@ -18,6 +36,21 @@ export default function (sequelize) {
       if (!folder) {
         return res.status(404).send('Folder not found');
       }
+
+      // Validate circular dependency before updating
+      if (parentFolderId) {
+        // Check if folder is being moved into itself
+        if (folderId === parentFolderId) {
+          return res.status(400).send('Cannot move folder into itself');
+        }
+
+        // Check if target parent is a descendant of the folder being moved
+        const isCircular = await isDescendant(folderId, parentFolderId);
+        if (isCircular) {
+          return res.status(400).send('Cannot move folder into its own descendant');
+        }
+      }
+
       await folder.update({
         name,
         detail,

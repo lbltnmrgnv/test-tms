@@ -130,15 +130,14 @@ export default function (sequelize) {
       const folders = await Folder.findAll({ where: { projectId } });
       const folderIds = folders.map(f => f.id);
 
-      if (!folderIds.length) return res.json([]); // нет папок — пустой результат
+      if (!folderIds.length) return res.json([]);
 
-      // 2️⃣ Формируем whereClause для кейсов
       const whereClause = {
         folderId: { [Op.in]: folderIds },
       };
 
       if (search) {
-        const searchTerm = search.trim().slice(0, 100); // ограничение длины
+        const searchTerm = search.trim().slice(0, 100);
         if (searchTerm.length > 0) {
           whereClause[Op.or] = [
             { title: { [Op.like]: `%${searchTerm}%` } },
@@ -157,7 +156,6 @@ export default function (sequelize) {
         if (values.length) whereClause.type = { [Op.in]: values };
       }
 
-      // 3️⃣ Теги
       const tagInclude = {
         model: Tags,
         attributes: ['id', 'name'],
@@ -172,10 +170,58 @@ export default function (sequelize) {
         }
       }
 
-      // 4️⃣ Получаем кейсы
       const cases = await Case.findAll({
         where: whereClause,
         include: [tagInclude],
+      });
+
+      res.json(cases);
+    } catch (error) {
+      console.error(error);
+      res.status(500).send('Internal Server Error');
+    }
+  });
+
+  router.get('/recursive', verifySignedIn, verifyProjectVisibleFromFolderId, async (req, res) => {
+    const { folderId } = req.query;
+
+    if (!folderId) {
+      return res.status(400).json({ error: 'folderId is required' });
+    }
+
+    try {
+      // Recursive function to collect all descendant folder IDs
+      const collectDescendantFolderIds = async (parentId) => {
+        const childFolders = await Folder.findAll({
+          where: { parentFolderId: parentId },
+          attributes: ['id'],
+        });
+
+        let allIds = [parentId];
+
+        for (const childFolder of childFolders) {
+          const childIds = await collectDescendantFolderIds(childFolder.id);
+          allIds = allIds.concat(childIds);
+        }
+
+        return allIds;
+      };
+
+      // Collect all folder IDs including the root folder and all descendants
+      const folderIds = await collectDescendantFolderIds(parseInt(folderId, 10));
+
+      // Find all cases in these folders
+      const cases = await Case.findAll({
+        where: {
+          folderId: { [Op.in]: folderIds },
+        },
+        include: [
+          {
+            model: Tags,
+            attributes: ['id', 'name'],
+            through: { attributes: [] },
+          },
+        ],
       });
 
       res.json(cases);
