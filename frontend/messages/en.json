@@ -1,4 +1,9 @@
 {
+  "CaseStatus": {
+    "draft": "Draft",
+    "active": "Active",
+    "deprecated": "Deprecated"
+  },
   "RunStatus": {
     "new": "New",
     "inProgress": "In progress",
@@ -263,6 +268,7 @@
     "please_enter_title": "Please enter title",
     "description": "Description",
     "test_case_description": "Test case description",
+    "status": "Status",
     "priority": "Priority",
     "type": "Type",
     "template": "Template",

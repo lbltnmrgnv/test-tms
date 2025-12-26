@@ -1,4 +1,9 @@
 {
+  "CaseStatus": {
+    "draft": "Черновик",
+    "active": "Активный",
+    "deprecated": "Устаревший"
+  },
   "RunStatus": {
     "new": "Новый",
     "inProgress": "В процессе",
@@ -263,6 +268,7 @@
     "please_enter_title": "Введите название",
     "description": "Описание",
     "test_case_description": "Описание тест-кейса",
+    "status": "Статус",
     "priority": "Приоритет",
     "type": "Тип",
     "template": "Шаблон",

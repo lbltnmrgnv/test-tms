@@ -2,6 +2,7 @@ import { useTranslations } from 'next-intl';
 import CaseEditor from './CaseEditor';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
+import { CaseStatusMessages } from '@/types/status';
 
 export default function Page({
   params,
@@ -24,6 +25,7 @@ export default function Page({
     pleaseEnterTitle: t('please_enter_title'),
     description: t('description'),
     testCaseDescription: t('test_case_description'),
+    status: t('status'),
     priority: t('priority'),
     type: t('type'),
     template: t('template'),
@@ -81,6 +83,13 @@ export default function Page({
     low: priorityTranslation('low'),
   };
 
+  const caseStatusTranslation = useTranslations('CaseStatus');
+  const caseStatusMessages: CaseStatusMessages = {
+    draft: caseStatusTranslation('draft'),
+    active: caseStatusTranslation('active'),
+    deprecated: caseStatusTranslation('deprecated'),
+  };
+
   return (
     <CaseEditor
       projectId={params.projectId}
@@ -89,6 +98,7 @@ export default function Page({
       messages={messages}
       testTypeMessages={testTypeMessages}
       priorityMessages={priorityMessages}
+      caseStatusMessages={caseStatusMessages}
       locale={params.locale}
     />
   );

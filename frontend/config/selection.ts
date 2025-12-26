@@ -1,5 +1,5 @@
 import { AutomationStatusType, GlobalRoleType, MemberRoleType, TemplateType } from '@/types/base';
-import { RunStatusType, TestRunCaseStatusType } from '@/types/status';
+import { CaseStatusType, RunStatusType, TestRunCaseStatusType } from '@/types/status';
 import { TestTypeType } from '@/types/testType';
 import { PriorityType } from '@/types/priority';
 import { LocaleType } from '@/types/locale';
@@ -14,6 +14,13 @@ const locales: LocaleType[] = [
   { code: 'ru', name: 'Русский' },
   { code: 'ja', name: '日本語' },
   { code: 'pt-BR', name: 'Português' },
+];
+
+// The status of each test case
+const caseStatus: CaseStatusType[] = [
+  { uid: 'draft', color: 'default', iconColor: '#71717a' },
+  { uid: 'active', color: 'success', iconColor: '#22c55e' },
+  { uid: 'deprecated', color: 'warning', iconColor: '#eab308' },
 ];
 
 // The status of each test run
@@ -75,6 +82,7 @@ export {
   roles,
   memberRoles,
   locales,
+  caseStatus,
   priorities,
   testTypes,
   automationStatus,

@@ -6,6 +6,7 @@ import { FilterOptions } from '@/types/filter';
 import { LocaleCodeType } from '@/types/locale';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
+import { CaseStatusMessages } from '@/types/status';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
 import ArboristTree from '@/src/app/[locale]/projects/[projectId]/folders/ArboristTree';
 import AdvancedFilterInput from '@/src/app/[locale]/projects/[projectId]/folders/components/AdvancedFilterInput';
@@ -21,10 +22,11 @@ type Props = {
   messages: CasesMessages;
   priorityMessages?: PriorityMessages;
   testTypeMessages?: TestTypeMessages;
+  caseStatusMessages?: CaseStatusMessages;
   locale: LocaleCodeType;
 };
 
-export default function CasesPane({ projectId, messages, priorityMessages, testTypeMessages }: Props) {
+export default function CasesPane({ projectId, messages, priorityMessages, testTypeMessages, caseStatusMessages }: Props) {
   const context = useContext(TokenContext);
 
   const [isCaseDialogOpen, setIsCaseDialogOpen] = useState(false);
@@ -165,8 +167,9 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
               folderId={String(selectedCase.folderId ?? '')}
               caseId={String(selectedCase.id)}
               messages={messages as any}
-              testTypeMessages={{} as any}
-              priorityMessages={{} as any}
+              testTypeMessages={testTypeMessages ?? ({} as any)}
+              priorityMessages={priorityMessages ?? ({} as any)}
+              caseStatusMessages={caseStatusMessages ?? ({} as any)}
               locale={'en'}
               onUpdated={handleCaseUpdated}
             />

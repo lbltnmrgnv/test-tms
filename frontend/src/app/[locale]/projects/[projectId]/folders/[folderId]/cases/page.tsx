@@ -3,6 +3,7 @@ import { useTranslations } from 'next-intl';
 import CasesPane from './CasesPane';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
+import { CaseStatusMessages } from '@/types/status';
 import { LocaleCodeType } from '@/types/locale';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: LocaleCodeType } }) {
@@ -87,6 +88,13 @@ export default function Page({ params }: { params: { projectId: string; folderId
     manual: testTypeTranslation('manual'),
   };
 
+  const caseStatusTranslation = useTranslations('CaseStatus');
+  const caseStatusMessages: CaseStatusMessages = {
+    draft: caseStatusTranslation('draft'),
+    active: caseStatusTranslation('active'),
+    deprecated: caseStatusTranslation('deprecated'),
+  };
+
   return (
     <>
       <CasesPane
@@ -96,6 +104,7 @@ export default function Page({ params }: { params: { projectId: string; folderId
         messages={messages}
         priorityMessages={priorityMessages}
         testTypeMessages={testTypeMessages}
+        caseStatusMessages={caseStatusMessages}
       />
     </>
   );

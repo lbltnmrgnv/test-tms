@@ -1,6 +1,9 @@
 // Enum mappings for database numeric values to human-readable labels
 // These correspond to the frontend config/selection.ts configurations
 
+// The status of each test case
+const caseStatus = ['draft', 'active', 'deprecated'];
+
 // The status of each test case in test run
 const testRunCaseStatus = ['untested', 'passed', 'failed', 'retest', 'skipped'];
 
@@ -33,4 +36,4 @@ const automationStatus = ['automated', 'automation-not-required', 'cannot-be-aut
 // Templates
 const templates = ['text', 'step'];
 
-export { testRunCaseStatus, testRunStatus, priorities, testTypes, automationStatus, templates };
+export { caseStatus, testRunCaseStatus, testRunStatus, priorities, testTypes, automationStatus, templates };

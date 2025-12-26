@@ -120,6 +120,7 @@ type CaseMessages = {
   pleaseEnterTitle: string;
   description: string;
   testCaseDescription: string;
+  status: string;
   priority: string;
   type: string;
   template: string;

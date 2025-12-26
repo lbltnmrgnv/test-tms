@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useContext, ChangeEvent, DragEvent } from 'react';
-import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge } from '@heroui/react';
+import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge, Chip, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
 import { Save, Plus, Circle } from 'lucide-react';
 import CaseStepsEditor from './CaseStepsEditor';
 import CaseAttachmentsEditor from './CaseAttachmentsEditor';
@@ -10,7 +10,8 @@ import CaseTagsEditor from './CaseTagsEditor';
 import { CaseType, AttachmentType, CaseMessages, StepType } from '@/types/case';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
-import { priorities, testTypes, templates } from '@/config/selection';
+import { CaseStatusMessages } from '@/types/status';
+import { priorities, testTypes, templates, caseStatus } from '@/config/selection';
 import { logError } from '@/utils/errorHandler';
 import { fetchCase, updateCase } from '@/utils/caseControl';
 import { updateCaseTags } from '@/utils/caseTagsControls';
@@ -43,6 +44,7 @@ type Props = {
   messages: CaseMessages;
   testTypeMessages: TestTypeMessages;
   priorityMessages: PriorityMessages;
+  caseStatusMessages: CaseStatusMessages;
   locale: string;
   onUpdated?: (updatedCase: CaseType) => void;
 };
@@ -53,6 +55,7 @@ export default function CaseEditor({
   messages,
   testTypeMessages,
   priorityMessages,
+  caseStatusMessages,
   onUpdated,
 }: Props) {
   const tokenContext = useContext(TokenContext);
@@ -246,8 +249,45 @@ export default function CaseEditor({
       {/* Fixed Header */}
       <div className="border-b-1 dark:border-neutral-700 w-full p-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 flex-1">
+          <Dropdown>
+            <DropdownTrigger>
+              <Chip
+                color={caseStatus[testCase.state].color as any}
+                variant="flat"
+                size="sm"
+                className="cursor-pointer"
+              >
+                {caseStatusMessages[caseStatus[testCase.state].uid]}
+              </Chip>
+            </DropdownTrigger>
+            <DropdownMenu
+              aria-label="Change status"
+              disallowEmptySelection
+              selectedKeys={[caseStatus[testCase.state].uid]}
+              selectionMode="single"
+              onSelectionChange={(keys) => {
+                if (keys !== 'all') {
+                  const selectedUid = Array.from(keys)[0];
+                  const index = caseStatus.findIndex((status) => status.uid === selectedUid);
+                  if (index !== -1 && index !== testCase.state) {
+                    setTestCase({ ...testCase, state: index });
+                    setIsDirty(true);
+                  }
+                }
+              }}
+            >
+              {caseStatus.map((status) => (
+                <DropdownItem
+                  key={status.uid}
+                  startContent={<Circle size={8} color={status.iconColor} fill={status.iconColor} />}
+                >
+                  {caseStatusMessages[status.uid]}
+                </DropdownItem>
+              ))}
+            </DropdownMenu>
+          </Dropdown>
           <span className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">
-            Test Case #{testCase.id}:
+            #{testCase.id}
           </span>
           {isTitleEditing ? (
             <Input
@@ -370,6 +410,7 @@ export default function CaseEditor({
                 const selectedUid = Array.from(newSelection)[0];
                 const index = priorities.findIndex((priority) => priority.uid === selectedUid);
                 setTestCase({ ...testCase, priority: index });
+                setIsDirty(true);
               }
             }}
             startContent={

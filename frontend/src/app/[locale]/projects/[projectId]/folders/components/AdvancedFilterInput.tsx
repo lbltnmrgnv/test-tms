@@ -39,7 +39,7 @@ export default function AdvancedFilterInput({
   const [incompleteChip, setIncompleteChip] = useState<FilterType | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Загрузка тегов
+  // Load tags
   useEffect(() => {
     const loadTags = async () => {
       const tagsData = await fetchTags(context.token.access_token, projectId);
@@ -48,7 +48,7 @@ export default function AdvancedFilterInput({
     loadTags();
   }, [projectId, context.token.access_token]);
 
-  // Обработка нажатия клавиш
+  // Handle key presses
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && inputValue.trim()) {
       addChip('text', inputValue.trim(), inputValue.trim());
@@ -59,19 +59,19 @@ export default function AdvancedFilterInput({
     }
   };
 
-  // Добавление чипа
+  // Add chip
   const addChip = (type: FilterType, label: string, value: string | number) => {
-    // Если редактируем существующий chip - удаляем его
+    // If editing existing chip - remove it
     let baseChips = chips;
     if (editingChipId) {
       baseChips = chips.filter((c) => c.id !== editingChipId);
       setEditingChipId(null);
     }
 
-    // Убираем incomplete chip
+    // Remove incomplete chip
     setIncompleteChip(null);
 
-    // Для text - заменяем предыдущий
+    // For text - replace previous
     if (type === 'text') {
       const newChips = baseChips.filter((c) => c.type !== 'text');
       const newChip = { id: `text-${Date.now()}`, type, label, value };
@@ -82,7 +82,7 @@ export default function AdvancedFilterInput({
       return;
     }
 
-    // Проверка дублей для priority, type, tag
+    // Check for duplicates for priority, type, tag
     const isDuplicate = baseChips.some((c) => c.type === type && c.value === value);
     if (isDuplicate) {
       setActiveFilterType(null);
@@ -94,18 +94,18 @@ export default function AdvancedFilterInput({
     setChips(updatedChips);
     setActiveFilterType(null);
 
-    // Автоприменение
+    // Auto-apply
     applyFiltersFromChips(updatedChips);
   };
 
-  // Удаление чипа
+  // Remove chip
   const removeChip = (chipId: string) => {
     const newChips = chips.filter((c) => c.id !== chipId);
     setChips(newChips);
     applyFiltersFromChips(newChips);
   };
 
-  // Применение фильтров из чипов
+  // Apply filters from chips
   const applyFiltersFromChips = (currentChips: FilterChip[]) => {
     const filters: FilterOptions = {};
 
@@ -132,23 +132,23 @@ export default function AdvancedFilterInput({
     onChange(filters);
   };
 
-  // Очистка всех фильтров
+  // Clear all filters
   const clearAllFilters = () => {
     setChips([]);
     setInputValue('');
     onChange({});
   };
 
-  // Обработчик изменения input
+  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
-    // Закрываем dropdown при вводе текста
+    // Close dropdown when typing
     if (e.target.value) {
       setIsMainDropdownOpen(false);
     }
   };
 
-  // Обработчик клика на chip для изменения значения
+  // Handle chip click to edit value
   const handleChipClick = (chip: FilterChip, e: React.MouseEvent) => {
     e.stopPropagation();
     if (chip.type !== 'text') {
@@ -157,7 +157,7 @@ export default function AdvancedFilterInput({
     }
   };
 
-  // Рендер главного dropdown с типами фильтров
+  // Render main dropdown with filter types
   const renderMainDropdown = () => {
     if (!isMainDropdownOpen) return null;
 
@@ -191,7 +191,7 @@ export default function AdvancedFilterInput({
     );
   };
 
-  // Рендер вторичного dropdown для выбора значений
+  // Render secondary dropdown for value selection
   const renderSecondaryDropdown = () => {
     if (!activeFilterType) return null;
 
@@ -281,7 +281,7 @@ export default function AdvancedFilterInput({
 
   return (
     <div style={{ position: 'relative' }}>
-      {/* Overlay для закрытия dropdown'ов */}
+      {/* Overlay to close dropdowns */}
       {(isMainDropdownOpen || activeFilterType) && (
         <div
           className="filter-overlay"
@@ -394,10 +394,10 @@ export default function AdvancedFilterInput({
         )}
       </div>
 
-      {/* Main dropdown для выбора типа фильтра */}
+      {/* Main dropdown for filter type selection */}
       {renderMainDropdown()}
 
-      {/* Secondary dropdown для выбора значений */}
+      {/* Secondary dropdown for value selection */}
       {renderSecondaryDropdown()}
     </div>
   );

@@ -1,4 +1,9 @@
 {
+  "CaseStatus": {
+    "draft": "下書き",
+    "active": "アクティブ",
+    "deprecated": "非推奨"
+  },
   "RunStatus": {
     "new": "新規",
     "inProgress": "進行中",
@@ -263,6 +268,7 @@
     "please_enter_title": "タイトルを入力してください",
     "description": "詳細",
     "test_case_description": "テストケース詳細",
+    "status": "ステータス",
     "priority": "優先度",
     "type": "タイプ",
     "template": "テンプレート",

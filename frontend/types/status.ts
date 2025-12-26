@@ -1,3 +1,18 @@
+// The status of each test case
+type CaseStatusUidType = 'draft' | 'active' | 'deprecated';
+
+type CaseStatusType = {
+  uid: CaseStatusUidType;
+  color: string;
+  iconColor: string;
+};
+
+type CaseStatusMessages = {
+  draft: string;
+  active: string;
+  deprecated: string;
+};
+
 // The status of each test run
 type RunStatusUidType = 'new' | 'inProgress' | 'underReview' | 'rejected' | 'done' | 'closed';
 
@@ -32,6 +47,9 @@ type TestRunCaseStatusMessages = {
 };
 
 export type {
+  CaseStatusUidType,
+  CaseStatusType,
+  CaseStatusMessages,
   RunStatusUidType,
   RunStatusType,
   RunStatusMessages,
