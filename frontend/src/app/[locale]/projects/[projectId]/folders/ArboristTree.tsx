@@ -1,3 +1,14 @@
+/**
+ * ArboristTree - компонент дерева папок и тест-кейсов с поддержкой drag-and-drop
+ *
+ * ИСПРАВЛЕНИЕ БАГА: Родительские узлы закрывались при клике на тест-кейс
+ *
+ * Решение:
+ * 1. Используется initialOpenState для сохранения состояния раскрытых узлов
+ * 2. Tree API (через ref) используется для получения текущего состояния узлов
+ * 3. При обновлении treeData состояние открытых узлов сохраняется и применяется через initialOpenState
+ * 4. Состояние сохраняется перед каждым обновлением данных (updatedCase, filter change)
+ */
 'use client';
 import { useState, useEffect, useContext, useRef } from 'react';
 import { Tree, NodeApi } from 'react-arborist';
@@ -53,6 +64,10 @@ export default function ArboristTree({
   const [treeData, setTreeData] = useState<NodeData[]>([]);
   const [allFolders, setAllFolders] = useState<FolderType[]>([]);
   const nodesMapRef = useRef<Record<number, NodeApi<NodeData>>>({});
+  const treeRef = useRef<any>(null);
+
+  // Сохраняем состояние открытых узлов для initialOpenState
+  const [initialOpenState, setInitialOpenState] = useState<Record<string, boolean>>({});
 
   // Проверка, является ли фильтр пустым
   const isFilterEmpty = (filter: FilterOptions): boolean => {
@@ -190,17 +205,52 @@ export default function ArboristTree({
 
   // --- Клик по узлу ---
   const handleClick = async (node: NodeApi<NodeData>) => {
+    console.log('[ArboristTree] handleClick:', {
+      nodeId: node.data.id,
+      isCase: node.data.isCase,
+      isOpen: node.isOpen
+    });
+
     if (node.data.isCase && node.data.caseData) {
+      console.log('[ArboristTree] Clicking on case, NOT toggling tree');
       onCaseClick?.(node.data.caseData);
       return;
     }
+
+    // Для папок - toggle с сохранением состояния через Tree API
+    console.log('[ArboristTree] Toggling folder:', node.data.id);
     node.toggle();
+
+    // Сохраняем состояние открытых узлов после toggle
+    if (treeRef.current) {
+      const newOpenState: Record<string, boolean> = {};
+      treeRef.current.visibleNodes.forEach((n: NodeApi<NodeData>) => {
+        if (!n.data.isCase) {
+          newOpenState[n.data.id] = n.isOpen;
+        }
+      });
+      setInitialOpenState(newOpenState);
+    }
+
     await loadFolder(node.data);
   };
 
   // --- Внешнее обновление кейса (из редактора) ---
   useEffect(() => {
     if (!updatedCase) return;
+    console.log('[ArboristTree] updatedCase changed:', updatedCase.id, updatedCase.title);
+
+    // Сохраняем текущее состояние открытых узлов перед обновлением
+    if (treeRef.current) {
+      const currentOpenState: Record<string, boolean> = {};
+      treeRef.current.visibleNodes.forEach((n: NodeApi<NodeData>) => {
+        if (!n.data.isCase) {
+          currentOpenState[n.data.id] = n.isOpen;
+        }
+      });
+      setInitialOpenState(currentOpenState);
+    }
+
     const recursiveUpdate = (nodes: NodeData[]): NodeData[] =>
       nodes.map((n) => {
         if (n.isCase && n.caseData?.id === updatedCase.id) {
@@ -215,24 +265,52 @@ export default function ArboristTree({
   // --- Чекбоксы ---
   const toggleCheck = (node: NodeApi<NodeData>) => {
     const newState = !node.data.checked;
+
+    // Рекурсивно обновляем состояние всех дочерних узлов
     const updateChildren = (nodes: NodeData[], state: boolean): NodeData[] =>
-      nodes.map((n) => ({ ...n, checked: state, indeterminate: false, children: updateChildren(n.children, state) }));
+      nodes.map((n) => ({
+        ...n,
+        checked: state,
+        indeterminate: false,
+        children: updateChildren(n.children, state),
+      }));
+
+    // Применяем обновление к целевому узлу и его детям
     const applyUpdate = (nodes: NodeData[]): NodeData[] =>
-      nodes.map((n) =>
-        n.id === node.data.id
-          ? { ...n, checked: newState, indeterminate: false, children: updateChildren(n.children, newState) }
-          : { ...n, children: applyUpdate(n.children) }
-      );
+      nodes.map((n) => {
+        if (n.id === node.data.id) {
+          return {
+            ...n,
+            checked: newState,
+            indeterminate: false,
+            children: updateChildren(n.children, newState),
+          };
+        }
+        return {
+          ...n,
+          children: applyUpdate(n.children),
+        };
+      });
+
+    // Обновляем состояние родительских узлов (indeterminate/checked)
     const updateParents = (nodes: NodeData[]): NodeData[] => {
       const process = (n: NodeData): NodeData => {
         if (!n.children.length) return n;
+
         const children = n.children.map(process);
         const allChecked = children.every((c) => c.checked);
         const noneChecked = children.every((c) => !c.checked && !c.indeterminate);
-        return { ...n, children, checked: allChecked, indeterminate: !allChecked && !noneChecked };
+
+        return {
+          ...n,
+          children,
+          checked: allChecked,
+          indeterminate: !allChecked && !noneChecked,
+        };
       };
       return nodes.map(process);
     };
+
     setTreeData(updateParents(applyUpdate(treeData)));
   };
 
@@ -508,11 +586,45 @@ export default function ArboristTree({
   };
   saveOpenState(treeData);
 
+  // Ref для отслеживания первой загрузки
+  const isInitialLoad = useRef(true);
+  const prevFilterRef = useRef(filter);
+
   // --- Фильтрация только при trigger ---
   useEffect(() => {
+    // Проверяем, изменился ли фильтр
+    const filterChanged = JSON.stringify(prevFilterRef.current) !== JSON.stringify(filter);
+    prevFilterRef.current = filter;
+
+    console.log('[ArboristTree] Filter effect triggered', {
+      filter,
+      isInitialLoad: isInitialLoad.current,
+      filterChanged
+    });
+
     if (isFilterEmpty(filter)) {
+      // Если фильтр пустой и это не первая загрузка и фильтр не менялся,
+      // НЕ перезагружаем дерево (это может быть вызвано изменением allFolders)
+      if (!isInitialLoad.current && !filterChanged && treeData.length > 0) {
+        console.log('[ArboristTree] Skipping full tree reload - no filter change');
+        return;
+      }
+
+      // Сохраняем состояние открытых узлов перед сбросом фильтра
+      if (treeRef.current) {
+        const currentOpenState: Record<string, boolean> = {};
+        treeRef.current.visibleNodes.forEach((n: NodeApi<NodeData>) => {
+          if (!n.data.isCase) {
+            currentOpenState[n.data.id] = n.isOpen;
+          }
+        });
+        setInitialOpenState(currentOpenState);
+      }
+
       // --- сброс к исходному дереву ---
       const loadFullTree = async () => {
+        console.log('[ArboristTree] Loading full tree');
+
         // сначала корневые папки
         const roots = allFolders
           .filter((f) => f.parentFolderId === null)
@@ -541,6 +653,8 @@ export default function ArboristTree({
         };
 
         await loadCasesRecursively(roots);
+        console.log('[ArboristTree] Full tree loaded');
+        isInitialLoad.current = false;
       };
 
       loadFullTree();
@@ -623,7 +737,9 @@ export default function ArboristTree({
 
     loadFilteredTree();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, allFolders, ctx, projectId, onFilterCount]);
+  }, [filter, allFolders, ctx, projectId]);
+  // ВАЖНО: onFilterCount НЕ должен быть в зависимостях,
+  // так как это функция из props, которая может меняться при каждом рендере
 
   return (
     <>
@@ -639,11 +755,13 @@ export default function ArboristTree({
       >
         {treeHeight > 0 && (
           <Tree
+            ref={treeRef}
             data={treeData}
             height={treeHeight}
             width={treeWidth}
             childrenAccessor="children"
             openByDefault={false}
+            initialOpenState={initialOpenState}
             onMove={handleMove}
             disableDrag={(node) => !node.isCase || node.isCreateNode === true}
             disableDrop={({ parentNode }) => !parentNode?.data.folderId}

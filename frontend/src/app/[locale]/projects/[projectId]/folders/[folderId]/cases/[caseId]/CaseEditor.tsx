@@ -62,6 +62,7 @@ export default function CaseEditor({
   const [plusCount, setPlusCount] = useState<number>(0);
   const [isDirty, setIsDirty] = useState(false);
   const [selectedTags, setSelectedTags] = useState<{ id: number; name: string }[]>([]);
+  const [isTitleEditing, setIsTitleEditing] = useState<boolean>(false);
 
   useFormGuard(isDirty, messages.areYouSureLeave);
 
@@ -244,13 +245,41 @@ export default function CaseEditor({
     >
       {/* Fixed Header */}
       <div className="border-b-1 dark:border-neutral-700 w-full p-3 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <span className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">
             Test Case #{testCase.id}:
           </span>
-          <span className="text-sm font-medium text-neutral-800 dark:text-neutral-200">
-            {testCase.title || 'Untitled'}
-          </span>
+          {isTitleEditing ? (
+            <Input
+              size="sm"
+              type="text"
+              variant="bordered"
+              value={testCase.title}
+              autoFocus
+              onChange={(e) => {
+                setTestCase({ ...testCase, title: e.target.value });
+                setIsDirty(true);
+              }}
+              onBlur={() => setIsTitleEditing(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  setIsTitleEditing(false);
+                }
+              }}
+              className="max-w-md"
+            />
+          ) : (
+            <span
+              className="text-sm font-medium text-neutral-800 dark:text-neutral-200 cursor-text"
+              onDoubleClick={() => {
+                if (tokenContext.isProjectDeveloper(Number(projectId))) {
+                  setIsTitleEditing(true);
+                }
+              }}
+            >
+              {testCase.title || 'Untitled'}
+            </span>
+          )}
         </div>
         <div className="flex items-center">
           <Button
@@ -308,19 +337,6 @@ export default function CaseEditor({
         }}
       >
         <h6 className="font-bold">{messages.basic}</h6>
-        <Input
-          size="sm"
-          type="text"
-          variant="bordered"
-          label={messages.title}
-          value={testCase.title}
-          isInvalid={isTitleInvalid}
-          errorMessage={isTitleInvalid ? messages.pleaseEnterTitle : ''}
-          onChange={(e) => {
-            setTestCase({ ...testCase, title: e.target.value });
-          }}
-          className="mt-3"
-        />
 
         <Textarea
           size="sm"
