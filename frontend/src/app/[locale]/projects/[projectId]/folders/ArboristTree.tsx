@@ -10,6 +10,7 @@ import { CaseType, CasesMessages } from '@/types/case';
 import { FilterOptions } from '@/types/filter';
 import { FolderType } from '@/types/folder';
 import CaseDialog from '@/src/app/[locale]/projects/[projectId]/folders/[folderId]/cases/CaseMoveDialog';
+import CaseDeleteDialog from '@/src/app/[locale]/projects/[projectId]/folders/CaseDeleteDialog';
 import { TokenContext } from '@/utils/TokenProvider';
 import { fetchCases, moveCases, searchCases, createCase, fetchCasesCount, deleteCases, updateCase, fetchCasesRecursive } from '@/utils/caseControl';
 import { fetchFolders, createFolder, deleteFolder, updateFolder } from './foldersControl';
@@ -77,6 +78,11 @@ export default function ArboristTree({
   const [foldersToMove, setFoldersToMove] = useState<NodeData[]>([]);
   const [targetFolderId, setTargetFolderId] = useState<number | undefined>(undefined);
   const [totalCasesInFolders, setTotalCasesInFolders] = useState<number>(0);
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [casesToDelete, setCasesToDelete] = useState<NodeData[]>([]);
+  const [foldersToDelete, setFoldersToDelete] = useState<NodeData[]>([]);
+  const [totalCasesInDeleteFolders, setTotalCasesInDeleteFolders] = useState<number>(0);
 
   const treeContainerRef = useRef<HTMLDivElement | null>(null);
   const [treeHeight, setTreeHeight] = useState<number>(0);
@@ -276,33 +282,75 @@ export default function ArboristTree({
     const node = contextMenu.node;
     closeContextMenu();
 
+    if (node.data.isCase && node.data.caseData) {
+      // Show delete confirmation for case
+      setCasesToDelete([node.data]);
+      setFoldersToDelete([]);
+      setTotalCasesInDeleteFolders(0);
+      setIsDeleteDialogOpen(true);
+    } else if (node.data.folderId) {
+      // Show delete confirmation for folder
+      const folderId = node.data.folderId;
+      const recursiveCases = await fetchCasesRecursive(ctx.token.access_token, folderId);
+
+      setCasesToDelete([]);
+      setFoldersToDelete([node.data]);
+      setTotalCasesInDeleteFolders(recursiveCases.length);
+      setIsDeleteDialogOpen(true);
+    }
+  };
+
+  const handleDeleteConfirmed = async () => {
     try {
-      if (node.data.isCase && node.data.caseData) {
-        // Delete case
-        await deleteCases(ctx.token.access_token, [node.data.caseData.id], Number(projectId));
+      // Handle folder deletion
+      if (foldersToDelete.length > 0) {
+        for (const folderNode of foldersToDelete) {
+          if (!folderNode.folderId) continue;
+          await deleteFolder(ctx.token.access_token, folderNode.folderId);
+        }
 
-        // Remove from tree
-        const removeNode = (nodes: NodeData[]): NodeData[] =>
+        // Remove folders from tree and allFolders
+        const folderIds = foldersToDelete.map(f => f.folderId).filter((id): id is number => id !== undefined);
+        const removeNodes = (nodes: NodeData[]): NodeData[] =>
           nodes
-            .map((n) => ({ ...n, children: removeNode(n.children) }))
-            .filter((n) => n.id !== node.data.id);
+            .map((n) => ({ ...n, children: removeNodes(n.children) }))
+            .filter((n) => n.folderId !== undefined && !folderIds.includes(n.folderId));
 
-        setTreeData((prev) => removeNode(prev));
-      } else if (node.data.folderId) {
-        // Delete folder
-        await deleteFolder(ctx.token.access_token, node.data.folderId);
+        setTreeData((prev) => removeNodes(prev));
+        setAllFolders((prev) => prev.filter((f) => !folderIds.includes(f.id)));
 
-        // Remove from tree and allFolders
-        const removeNode = (nodes: NodeData[]): NodeData[] =>
+        addToast({
+          title: 'Success',
+          color: 'success',
+          description: `${foldersToDelete.length} ${foldersToDelete.length === 1 ? 'folder' : 'folders'} deleted successfully`
+        });
+      }
+      // Handle case deletion
+      else if (casesToDelete.length > 0) {
+        const caseIds = casesToDelete.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined);
+        await deleteCases(ctx.token.access_token, caseIds, Number(projectId));
+
+        // Remove cases from tree
+        const removeNodes = (nodes: NodeData[]): NodeData[] =>
           nodes
-            .map((n) => ({ ...n, children: removeNode(n.children) }))
-            .filter((n) => n.id !== node.data.id);
+            .map((n) => ({ ...n, children: removeNodes(n.children) }))
+            .filter((n) => !caseIds.includes(n.caseData?.id ?? -1));
 
-        setTreeData((prev) => removeNode(prev));
-        setAllFolders((prev) => prev.filter((f) => f.id !== node.data.folderId));
+        setTreeData((prev) => removeNodes(prev));
+
+        addToast({
+          title: 'Success',
+          color: 'success',
+          description: `${casesToDelete.length} ${casesToDelete.length === 1 ? 'test case' : 'test cases'} deleted successfully`
+        });
       }
     } catch (error) {
       console.error('Error deleting:', error);
+      addToast({
+        title: 'Error',
+        color: 'danger',
+        description: error instanceof Error ? error.message : 'Failed to delete'
+      });
     }
   };
 
@@ -860,10 +908,12 @@ export default function ArboristTree({
     parentFolderId,
     style,
     level,
+    isRootLevel = false,
   }: {
-    parentFolderId: number;
+    parentFolderId: number | null;
     style: React.CSSProperties;
     level: number;
+    isRootLevel?: boolean;
   }) => {
     const [mode, setMode] = useState<CreateMode>('folder');
     const [value, setValue] = useState('');
@@ -905,9 +955,18 @@ export default function ArboristTree({
             indeterminate: false,
             open: false,
           };
-          addNodeToParent(parentFolderId, folderNode);
+
+          // For root level, add to tree root
+          if (isRootLevel) {
+            setTreeData((prev) => [...prev, folderNode]);
+          } else if (parentFolderId !== null) {
+            addNodeToParent(parentFolderId, folderNode);
+          }
         }
       } else {
+        // Cases can only be created inside folders
+        if (parentFolderId === null) return;
+
         const newCase = await createCase(ctx.token.access_token, String(parentFolderId), trimmedValue, '');
 
         if (newCase) {
@@ -1009,7 +1068,7 @@ export default function ArboristTree({
             fontSize: 'inherit',
           }}
         />
-        {isHovered && !value && (
+        {isHovered && !value && !isRootLevel && (
           <>
             <span className="hint-text">or create</span>
             <button
@@ -1227,7 +1286,19 @@ export default function ArboristTree({
           overflowY: 'auto',
         }}
       >
-        {treeHeight > 0 && (
+        {treeData.length === 0 && ctx.isProjectDeveloper(Number(projectId)) && (
+          <div style={{ padding: '8px 0' }}>
+            <CreateNodeRow
+              parentFolderId={null}
+              style={{
+                height: '32px',
+              }}
+              level={0}
+              isRootLevel={true}
+            />
+          </div>
+        )}
+        {treeHeight > 0 && treeData.length > 0 && (
           <Tree
             ref={treeRef}
             data={treeData}
@@ -1342,6 +1413,24 @@ export default function ArboristTree({
           onMoved={handleMoved}
           messages={messages}
           token={ctx.token.access_token}
+        />
+      )}
+
+      {isDeleteDialogOpen && (
+        <CaseDeleteDialog
+          isOpen={isDeleteDialogOpen}
+          testCaseIds={casesToDelete.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined)}
+          foldersCount={foldersToDelete.length}
+          totalCasesInFolders={totalCasesInDeleteFolders}
+          isDisabled={!ctx.isProjectDeveloper(Number(projectId))}
+          onCancel={() => {
+            setIsDeleteDialogOpen(false);
+            setCasesToDelete([]);
+            setFoldersToDelete([]);
+            setTotalCasesInDeleteFolders(0);
+          }}
+          onDelete={handleDeleteConfirmed}
+          messages={messages}
         />
       )}
 

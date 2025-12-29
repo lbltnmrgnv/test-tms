@@ -2,21 +2,59 @@
 @tailwind components;
 @tailwind utilities;
 
-[data-theme='dark'] .tree-row {
+/* Tree row styles - merged definition */
+.tree-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: Inter, system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    height: 28px;
+    min-height: 28px;
+    width: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    isolation: isolate;
+}
+
+.dark .tree-row {
     color: #e6e9ef;
 }
-[data-theme='dark'] .tree-row:hover {
-    background: rgba(255, 255, 255, 0.07);
-}
 
-[data-theme='light'] .tree-row {
+.light .tree-row {
     color: #2f3640;
 }
-[data-theme='light'] .tree-row:hover {
-    background: rgba(0, 0, 0, 0.06);
+
+/* Hover background with pseudo-element */
+.tree-row:not(.create-node-row):not(.selected-case):hover::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 0;
+    right: 0;
+    bottom: 2px;
+    pointer-events: none;
+    z-index: 0;
 }
 
-/* чекбоксы */
+.dark .tree-row:not(.create-node-row):not(.selected-case):hover::before {
+    background-color: rgba(255, 255, 255, 0.07);
+}
+
+.light .tree-row:not(.create-node-row):not(.selected-case):hover::before {
+    background-color: rgba(0, 0, 0, 0.06);
+}
+
+/* Ensure content is above background */
+.tree-row > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* checkboxes */
 .checkbox-input {
     width: 15px;
     height: 15px;
@@ -69,19 +107,6 @@
     pointer-events: none;
 }
 
-.tree-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-family: Inter, system-ui, -apple-system, sans-serif;
-    font-size: 14px;
-    height: 28px;              /* ← фиксируем строку */
-    min-height: 28px;
-
-    width: 100%;
-    overflow: hidden;
-}
-
 .title {
     flex: 1;
     min-width: 0;
@@ -91,11 +116,29 @@
     text-overflow: ellipsis;   /* ← … */
 }
 
-.selected-case {
-    background-color: rgba(59, 130, 246, 0.2); /* светло-синий */
+/* Selected background with pseudo-element */
+.selected-case::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 0;
+    right: 0;
+    bottom: 2px;
+    pointer-events: none;
+    z-index: 0;
 }
-[data-theme='dark'] .selected-case {
-    background-color: rgba(59, 130, 246, 0.4); /* чуть ярче для тёмной темы */
+
+.light .selected-case::after {
+    background-color: rgba(59, 130, 246, 0.2);
+}
+
+.dark .selected-case::after {
+    background-color: rgba(59, 130, 246, 0.4);
+}
+
+/* Selected case - stacking context isolated by parent .tree-row */
+.selected-case {
+    /* z-index removed to prevent overlap with adjacent rows */
 }
 
 input {
@@ -113,11 +156,11 @@ input {
 }
 
 [data-theme='dark'] .create-node-row:hover {
-    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.07);
 }
 
 [data-theme='light'] .create-node-row:hover {
-    background: rgba(0, 0, 0, 0.06);
+    box-shadow: inset 0 0 0 100px rgba(0, 0, 0, 0.06);
 }
 
 .create-node-input {
