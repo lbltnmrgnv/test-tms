@@ -53,7 +53,8 @@ async function searchCases(
   filterText?: string,
   priority?: number[],
   type?: number[],
-  tag?: number[]
+  tag?: number[],
+  statuses?: number[]
 ) {
   const queryParams = [`projectId=${projectId}`];
 
@@ -61,6 +62,7 @@ async function searchCases(
   if (priority && priority.length) queryParams.push(`priority=${priority.join(',')}`);
   if (type && type.length) queryParams.push(`type=${type.join(',')}`);
   if (tag && tag.length) queryParams.push(`tag=${tag.join(',')}`);
+  if (statuses && statuses.length) queryParams.push(`statuses=${statuses.join(',')}`);
 
   const query = queryParams.length ? `?${queryParams.join('&')}` : '';
   const url = `${apiServer}/cases/search${query}`;
@@ -89,7 +91,8 @@ async function fetchCases(
   search?: string,
   priority?: number[],
   type?: number[],
-  tag?: number[]
+  tag?: number[],
+  statuses?: number[]
 ) {
   const queryParams = [`folderId=${folderId}`];
 
@@ -107,6 +110,10 @@ async function fetchCases(
 
   if (tag && tag.length > 0) {
     queryParams.push(`tag=${tag.join(',')}`);
+  }
+
+  if (statuses && statuses.length > 0) {
+    queryParams.push(`statuses=${statuses.join(',')}`);
   }
 
   const query = queryParams.length > 0 ? `?${queryParams.join('&')}` : '';

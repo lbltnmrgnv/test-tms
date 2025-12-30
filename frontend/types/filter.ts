@@ -1,4 +1,4 @@
-export type FilterType = 'text' | 'priority' | 'type' | 'tag';
+export type FilterType = 'text' | 'priority' | 'type' | 'tag' | 'status';
 
 export interface FilterChip {
   id: string; // уникальный ID для React key
@@ -12,4 +12,5 @@ export interface FilterOptions {
   priorities?: number[]; // индексы 0-3
   types?: number[]; // индексы 0-12
   tags?: number[]; // ID тегов
+  statuses?: number[]; // индексы 0-2 (draft, active, deprecated)
 }

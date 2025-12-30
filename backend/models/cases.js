@@ -49,6 +49,8 @@ function defineCase(sequelize, DataTypes) {
       allowNull: false,
       defaultValue: false,
     },
+  }, {
+    tableName: 'cases',
   });
 
   Case.associate = (models) => {

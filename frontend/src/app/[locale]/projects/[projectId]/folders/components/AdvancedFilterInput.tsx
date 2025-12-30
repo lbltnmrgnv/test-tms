@@ -2,11 +2,12 @@
 import { useState, useEffect, useContext, useRef } from 'react';
 import { Circle, X, Search } from 'lucide-react';
 import { FilterOptions, FilterChip, FilterType } from '@/types/filter';
-import { priorities, testTypes } from '@/config/selection';
+import { priorities, testTypes, caseStatus } from '@/config/selection';
 import { fetchTags } from '@/utils/tagsControls';
 import { TokenContext } from '@/utils/TokenProvider';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
+import { CaseStatusMessages } from '@/types/status';
 import { TagType } from '@/types/tag';
 
 type Tag = Pick<TagType, 'id' | 'name'>;
@@ -17,6 +18,7 @@ interface Props {
   onChange: (filters: FilterOptions) => void;
   priorityMessages?: PriorityMessages;
   testTypeMessages?: TestTypeMessages;
+  caseStatusMessages?: CaseStatusMessages;
   placeholder?: string;
 }
 
@@ -26,6 +28,7 @@ export default function AdvancedFilterInput({
                                               onChange,
                                               priorityMessages,
                                               testTypeMessages,
+                                              caseStatusMessages,
                                               placeholder = 'Search or add filter...',
                                             }: Props) {
   const context = useContext(TokenContext);
@@ -82,7 +85,7 @@ export default function AdvancedFilterInput({
       return;
     }
 
-    // Check for duplicates for priority, type, tag
+    // Check for duplicates for priority, type, tag, status
     const isDuplicate = baseChips.some((c) => c.type === type && c.value === value);
     if (isDuplicate) {
       setActiveFilterType(null);
@@ -127,6 +130,11 @@ export default function AdvancedFilterInput({
     const tagChips = currentChips.filter((c) => c.type === 'tag');
     if (tagChips.length > 0) {
       filters.tags = tagChips.map((c) => c.value as number);
+    }
+
+    const statusChips = currentChips.filter((c) => c.type === 'status');
+    if (statusChips.length > 0) {
+      filters.statuses = statusChips.map((c) => c.value as number);
     }
 
     onChange(filters);
@@ -182,6 +190,12 @@ export default function AdvancedFilterInput({
           Type
         </button>
         <button
+          onClick={() => handleFilterTypeClick('status')}
+          className="filter-dropdown-button"
+        >
+          Status
+        </button>
+        <button
           onClick={() => handleFilterTypeClick('tag')}
           className="filter-dropdown-button"
         >
@@ -226,6 +240,25 @@ export default function AdvancedFilterInput({
                   className="filter-dropdown-button"
                 >
                   {testTypeMessages?.[t.uid]}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      case 'status': {
+        return (
+          <div className="filter-dropdown-secondary">
+            <div style={{ padding: 8 }}>
+              {caseStatus.map((s, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => addChip('status', `Status|${caseStatusMessages?.[s.uid] ?? s.uid}`, idx)}
+                  className="filter-dropdown-button-flex"
+                >
+                  <Circle size={8} color={s.iconColor} fill={s.iconColor} />
+                  <span>{caseStatusMessages?.[s.uid]}</span>
                 </button>
               ))}
             </div>
@@ -358,6 +391,7 @@ export default function AdvancedFilterInput({
               <span style={{ padding: '0 8px', fontWeight: 500 }}>
                 {incompleteChip === 'priority' && 'Priority'}
                 {incompleteChip === 'type' && 'Type'}
+                {incompleteChip === 'status' && 'Status'}
                 {incompleteChip === 'tag' && 'Tag'}
               </span>
               <div className="filter-chip-divider" />

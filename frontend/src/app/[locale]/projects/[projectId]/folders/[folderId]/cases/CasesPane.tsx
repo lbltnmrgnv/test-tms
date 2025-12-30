@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useContext } from 'react';
+import { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import { addToast, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
 import { MoreVertical, Trash2 } from 'lucide-react';
 import { CasesMessages, CaseType } from '@/types/case';
@@ -124,6 +124,10 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
     setRefreshTreeTrigger((prev) => prev + 1);
   };
 
+  const handleFilterCount = useCallback((count: number) => {
+    setFilteredCount(count);
+  }, []);
+
   return (
     <>
       <div ref={containerRef} style={{ display: 'flex', flex: 1, minHeight: 0, width: '100%', overflow: 'hidden' }}>
@@ -147,6 +151,7 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
               onChange={setCurrentFilter}
               priorityMessages={priorityMessages}
               testTypeMessages={testTypeMessages}
+              caseStatusMessages={caseStatusMessages}
               placeholder="Search or add filter..."
             />
           </div>
@@ -184,7 +189,7 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
             projectId={projectId}
             messages={messages}
             filter={currentFilter}
-            onFilterCount={(count) => setFilteredCount(count)}
+            onFilterCount={handleFilterCount}
             selectedCaseId={selectedCase?.id}
             onCaseClick={(caseData: CaseType) => setSelectedCase(caseData)}
             onCaseUpdated={handleCaseUpdated}

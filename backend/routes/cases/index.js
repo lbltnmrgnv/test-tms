@@ -20,7 +20,7 @@ export default function (sequelize) {
   Tags.belongsToMany(Case, { through: 'caseTags', foreignKey: 'tagId', otherKey: 'caseId' });
 
   router.get('/', verifySignedIn, verifyProjectVisibleFromFolderId, async (req, res) => {
-    const { folderId, search, priority, type, tag } = req.query;
+    const { folderId, search, priority, type, tag, statuses } = req.query;
 
     if (!folderId) {
       return res.status(400).json({ error: 'folderId is required' });
@@ -67,6 +67,16 @@ export default function (sequelize) {
         }
       }
 
+      if (statuses) {
+        const statusValues = statuses
+          .split(',')
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((s) => !isNaN(s));
+        if (statusValues.length > 0) {
+          whereClause.state = { [Op.in]: statusValues };
+        }
+      }
+
       const tagInclude = {
         model: Tags,
         attributes: ['id', 'name'],
@@ -89,6 +99,7 @@ export default function (sequelize) {
         where: whereClause,
         include: [tagInclude],
       });
+
       res.json(cases);
     } catch (error) {
       console.error(error);
@@ -121,7 +132,7 @@ export default function (sequelize) {
   });
 
   router.get('/search', verifySignedIn, verifyProjectVisibleFromProjectId, async (req, res) => {
-    const { projectId, search, priority, type, tag, isDeleted } = req.query;
+    const { projectId, search, priority, type, tag, isDeleted, statuses } = req.query;
 
     if (!projectId) {
       return res.status(400).json({ error: 'projectId is required' });
@@ -164,6 +175,11 @@ export default function (sequelize) {
       if (type) {
         const values = type.split(',').map(Number).filter(Number.isFinite);
         if (values.length) whereClause.type = { [Op.in]: values };
+      }
+
+      if (statuses) {
+        const values = statuses.split(',').map(Number).filter(Number.isFinite);
+        if (values.length) whereClause.state = { [Op.in]: values };
       }
 
       const tagInclude = {
