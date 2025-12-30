@@ -298,7 +298,9 @@
     "error_creating_tag": "Error creating tag",
     "error_updating_test_case": "Error updating test case",
     "search_or_create_tag": "Search or create tag",
-    "no_tags_selected": "No tags selected"
+    "no_tags_selected": "No tags selected",
+    "no_steps_yet": "No steps yet",
+    "add_step": "Add step"
   },
   "Runs": {
     "run_list": "Test Run List",

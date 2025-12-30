@@ -298,7 +298,9 @@
     "error_creating_tag": "Ошибка создания тега",
     "error_updating_test_case": "Ошибка обновления тест-кейса",
     "search_or_create_tag": "Найти или создать тег",
-    "no_tags_selected": "Теги не выбраны"
+    "no_tags_selected": "Теги не выбраны",
+    "no_steps_yet": "Шаги пока отсутствуют",
+    "add_step": "Добавить шаг"
   },
   "Runs": {
     "run_list": "Список тест-ранов",

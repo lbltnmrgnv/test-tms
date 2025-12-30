@@ -56,6 +56,8 @@ export default function Page({
     errorUpdatingTestCase: t('error_updating_test_case'),
     searchOrCreateTag: t('search_or_create_tag'),
     noTagsSelected: t('no_tags_selected'),
+    noStepsYet: t('no_steps_yet'),
+    addStep: t('add_step'),
   };
 
   const tt = useTranslations('Type');

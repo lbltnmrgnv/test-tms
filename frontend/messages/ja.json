@@ -298,7 +298,9 @@
     "error_creating_tag": "タグの作成中にエラーが発生しました",
     "error_updating_test_case": "テストケースの更新中にエラーが発生しました",
     "search_or_create_tag": "タグを検索または作成",
-    "no_tags_selected": "タグが選択されていません"
+    "no_tags_selected": "タグが選択されていません",
+    "no_steps_yet": "まだステップがありません",
+    "add_step": "ステップを追加"
   },
   "Runs": {
     "run_list": "テストラン一覧",

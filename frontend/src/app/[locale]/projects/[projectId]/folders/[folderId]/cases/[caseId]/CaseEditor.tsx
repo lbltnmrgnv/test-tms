@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useContext, ChangeEvent, DragEvent } from 'react';
 import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge, Chip, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
-import { Save, Plus, Circle } from 'lucide-react';
+import { Save, Circle } from 'lucide-react';
 import CaseStepsEditor from './CaseStepsEditor';
 import CaseAttachmentsEditor from './CaseAttachmentsEditor';
 import { updateSteps } from './stepControl';
@@ -69,7 +69,7 @@ export default function CaseEditor({
 
   useFormGuard(isDirty, messages.areYouSureLeave);
 
-  const onPlusClick = async (newStepNo: number) => {
+  const onPlusClick = async (newStepNo: number, parentStepId?: number) => {
     setIsDirty(true);
     const newStep: StepType = {
       id: plusCount,
@@ -82,12 +82,16 @@ export default function CaseEditor({
       },
       uid: `uid${plusCount}`,
       editState: 'new',
+      parentStepId: parentStepId || null,
     };
     setPlusCount(plusCount + 1);
 
     if (testCase.Steps) {
       const updatedSteps = testCase.Steps.map((step) => {
-        if (step.caseSteps.stepNo >= newStepNo) {
+        // Only update stepNo for steps at the same level (same parent)
+        const isSameLevel = parentStepId ? step.parentStepId === parentStepId : !step.parentStepId;
+
+        if (isSameLevel && step.caseSteps.stepNo >= newStepNo) {
           return {
             ...step,
             editState: step.editState === 'notChanged' ? 'changed' : step.editState,
@@ -112,17 +116,34 @@ export default function CaseEditor({
   const onDeleteClick = async (stepId: number) => {
     setIsDirty(true);
 
-    // find deletedStep's stepNo
     if (testCase.Steps) {
       const deletedStep = testCase.Steps.find((step) => step.id === stepId);
       if (!deletedStep) {
         return;
       }
-      const deletedStepNo = deletedStep.caseSteps.stepNo;
-      deletedStep.editState = 'deleted';
 
+      const deletedStepNo = deletedStep.caseSteps.stepNo;
+      const deletedParentId = deletedStep.parentStepId;
+
+      // Mark the deleted step and all its substeps as deleted
+      const markAsDeleted = (stepId: number): void => {
+        const step = testCase.Steps?.find((s) => s.id === stepId);
+        if (step) {
+          step.editState = 'deleted';
+          // Find and delete all substeps recursively
+          testCase.Steps?.filter((s) => s.parentStepId === stepId).forEach((substep) => {
+            markAsDeleted(substep.id);
+          });
+        }
+      };
+
+      markAsDeleted(stepId);
+
+      // Update step numbers for steps at the same level that come after the deleted step
       const updatedSteps = testCase.Steps.map((step) => {
-        if (step.caseSteps.stepNo > deletedStepNo) {
+        const isSameLevel = deletedParentId ? step.parentStepId === deletedParentId : !step.parentStepId;
+
+        if (isSameLevel && step.caseSteps.stepNo > deletedStepNo && step.editState !== 'deleted') {
           return {
             ...step,
             editState: step.editState === 'notChanged' ? 'changed' : step.editState,
@@ -446,82 +467,21 @@ export default function CaseEditor({
           </Select>
         </div>
 
-        <div>
-          <Select
-            size="sm"
-            variant="bordered"
-            selectedKeys={[templates[testCase.template].uid]}
-            onSelectionChange={(newSelection) => {
-              if (newSelection !== 'all' && newSelection.size !== 0) {
-                const selectedUid = Array.from(newSelection)[0];
-                const index = templates.findIndex((template) => template.uid === selectedUid);
-                setTestCase({ ...testCase, template: index });
-              }
-            }}
-            label={messages.template}
-            className="mt-3 max-w-xs"
-          >
-            {templates.map((template) => (
-              <SelectItem key={template.uid}>{messages[template.uid]}</SelectItem>
-            ))}
-          </Select>
-        </div>
-
         <Divider className="my-6" />
-        {templates[testCase.template].uid === 'text' ? (
-          <div>
-            <h6 className="font-bold">{messages.testDetail}</h6>
-            <div className="flex">
-              <Textarea
-                size="sm"
-                variant="bordered"
-                label={messages.preconditions}
-                value={testCase.preConditions}
-                onValueChange={(changeValue) => {
-                  setTestCase({ ...testCase, preConditions: changeValue });
-                }}
-                className="mt-3 pe-1"
-              />
-
-              <Textarea
-                size="sm"
-                variant="bordered"
-                label={messages.expectedResult}
-                value={testCase.expectedResults}
-                onValueChange={(changeValue) => {
-                  setTestCase({ ...testCase, expectedResults: changeValue });
-                }}
-                className="mt-3 ps-1"
-              />
-            </div>
-          </div>
-        ) : (
-          <div>
-            <div className="flex items-center mb-3">
-              <h6 className="font-bold">{messages.steps}</h6>
-              <Button
-                startContent={<Plus size={16} />}
-                size="sm"
-                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
-                color="primary"
-                className="ms-3"
-                onPress={() => onPlusClick(1)}
-              >
-                {messages.newStep}
-              </Button>
-            </div>
-            {testCase.Steps && (
-              <CaseStepsEditor
-                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
-                steps={testCase.Steps}
-                onStepUpdate={onStepUpdate}
-                onStepPlus={onPlusClick}
-                onStepDelete={onDeleteClick}
-                messages={messages}
-              />
-            )}
-          </div>
-        )}
+        <div>
+          <h6 className="font-bold mb-3">{messages.steps}</h6>
+          {testCase.Steps && (
+            <CaseStepsEditor
+              isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+              steps={testCase.Steps}
+              onStepUpdate={onStepUpdate}
+              onStepPlus={onPlusClick}
+              onStepDelete={onDeleteClick}
+              messages={messages}
+              onDirtyChange={() => setIsDirty(true)}
+            />
+          )}
+        </div>
 
         <Divider className="my-6" />
         <h6 className="font-bold">{messages.attachments}</h6>

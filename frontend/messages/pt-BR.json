@@ -298,7 +298,9 @@
     "error_creating_tag": "Erro ao criar tag",
     "error_updating_test_case": "Erro ao atualizar caso de teste",
     "search_or_create_tag": "Buscar ou criar tag",
-    "no_tags_selected": "Nenhuma tag selecionada"
+    "no_tags_selected": "Nenhuma tag selecionada",
+    "no_steps_yet": "Ainda não há passos",
+    "add_step": "Adicionar passo"
   },
   "Runs": {
     "run_list": "Lista de Execuções de Teste",

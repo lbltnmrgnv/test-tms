@@ -22,6 +22,7 @@ export default function (sequelize) {
         {
           step: step.step,
           result: step.result,
+          parentStepId: step.parentStepId || null,
         },
         { transaction: t }
       );
@@ -65,19 +66,93 @@ export default function (sequelize) {
       return step;
     };
     try {
-      const results = await Promise.all(
-        steps.map(async (step) => {
-          if (step.editState === 'new') {
-            return createStep(step);
-          } else if (step.editState === 'deleted') {
-            return deleteStep(step);
-          } else if (step.editState === 'changed') {
-            return updateStep(step);
-          } else if (step.editState === 'notChanged') {
-            return step;
+      // Map to track temporary IDs -> real database IDs
+      const idMap = new Map();
+
+      // Separate steps by operation type
+      const stepsToDelete = steps.filter(step => step.editState === 'deleted');
+      const stepsToUpdate = steps.filter(step => step.editState === 'changed');
+      const stepsToCreate = steps.filter(step => step.editState === 'new');
+      const stepsNotChanged = steps.filter(step => step.editState === 'notChanged');
+
+      // Helper function to sort steps for hierarchical creation
+      const sortStepsForCreation = (stepsArray) => {
+        const sorted = [];
+        const processed = new Set();
+        const queue = [...stepsArray];
+
+        while (queue.length > 0) {
+          const remainingCount = queue.length;
+
+          for (let i = queue.length - 1; i >= 0; i--) {
+            const step = queue[i];
+            // A step can be processed if it has no parent or its parent has been processed
+            if (!step.parentStepId || processed.has(step.parentStepId)) {
+              sorted.push(step);
+              processed.add(step.id);
+              queue.splice(i, 1);
+            }
           }
-        })
-      );
+
+          // If no progress was made, we have orphaned steps or circular dependencies
+          if (queue.length === remainingCount && queue.length > 0) {
+            // Process remaining steps without parent references to avoid infinite loop
+            queue.forEach(step => {
+              sorted.push({ ...step, parentStepId: null });
+              processed.add(step.id);
+            });
+            break;
+          }
+        }
+
+        return sorted;
+      };
+
+      // Process deletions first
+      await Promise.all(stepsToDelete.map(step => deleteStep(step)));
+
+      // Process updates (existing steps with real IDs)
+      const updatedSteps = await Promise.all(stepsToUpdate.map(step => updateStep(step)));
+
+      // Sort new steps to ensure parents are created before children
+      const sortedNewSteps = sortStepsForCreation(stepsToCreate);
+
+      // Create new steps sequentially to handle parent-child relationships
+      const createdSteps = [];
+      for (const step of sortedNewSteps) {
+        // Replace temporary parentStepId with real ID if it exists in the map
+        let parentStepId = step.parentStepId;
+        if (parentStepId !== null && parentStepId !== undefined) {
+          if (idMap.has(parentStepId)) {
+            // Replace with real ID
+            parentStepId = idMap.get(parentStepId);
+          } else if (typeof parentStepId === 'number' && parentStepId >= 0) {
+            // If it's a temporary ID that hasn't been created yet, set to null
+            parentStepId = null;
+          }
+        }
+
+        const stepToCreate = {
+          ...step,
+          parentStepId: parentStepId || null
+        };
+
+        const newStep = await createStep(stepToCreate);
+
+        // Map the temporary ID to the real database ID
+        if (step.id !== undefined && step.id !== null) {
+          idMap.set(step.id, newStep.id);
+        }
+
+        createdSteps.push(newStep);
+      }
+
+      // Combine all results
+      const results = [
+        ...stepsNotChanged,
+        ...updatedSteps,
+        ...createdSteps
+      ];
 
       await t.commit();
       res.json(results.filter((result) => result !== null));

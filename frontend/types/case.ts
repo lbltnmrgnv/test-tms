@@ -36,6 +36,9 @@ type StepType = {
   caseSteps: CaseStepType;
   uid: string;
   editState: 'notChanged' | 'changed' | 'new' | 'deleted';
+  parentStepId?: number | null;
+  isCollapsed?: boolean;
+  substeps?: StepType[];
 };
 
 type RunCaseType = {
@@ -151,6 +154,8 @@ type CaseMessages = {
   errorUpdatingTestCase: string;
   searchOrCreateTag: string;
   noTagsSelected: string;
+  noStepsYet: string;
+  addStep: string;
 };
 
 export type { CaseType, StepType, AttachmentType, CasesMessages, CaseMessages };
