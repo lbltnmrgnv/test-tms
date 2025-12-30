@@ -63,6 +63,9 @@ export default function (sequelize) {
 
       try {
         const cases = await Case.findAll({
+          where: {
+            isDeleted: false,
+          },
           include: [
             {
               model: Folder,

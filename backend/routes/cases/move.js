@@ -18,12 +18,12 @@ export default function (sequelize) {
     }
 
     try {
-      const cases = await Case.findAll({ where: { id: caseIds } });
+      const cases = await Case.findAll({ where: { id: caseIds, isDeleted: false } });
       if (cases.length !== caseIds.length) {
         return res.status(404).json({ error: 'Some cases not found' });
       }
 
-      await Case.update({ folderId: targetFolderId }, { where: { id: caseIds } });
+      await Case.update({ folderId: targetFolderId }, { where: { id: caseIds, isDeleted: false } });
 
       res.status(200).json({ message: 'Cases moved successfully', movedCaseIds: caseIds, targetFolderId });
     } catch (error) {

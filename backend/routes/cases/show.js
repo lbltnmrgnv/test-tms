@@ -30,7 +30,8 @@ export default function (sequelize) {
     }
 
     try {
-      const testcase = await Case.findByPk(caseId, {
+      const testcase = await Case.findOne({
+        where: { id: caseId, isDeleted: false },
         include: [
           {
             model: Step,

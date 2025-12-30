@@ -68,7 +68,8 @@ export default function verifyVisibleMiddleware(sequelize) {
     }
 
     // find project id from caseId
-    const testCase = await Case.findByPk(caseId, {
+    const testCase = await Case.findOne({
+      where: { id: caseId, isDeleted: false },
       include: {
         model: Folder,
         include: Project,

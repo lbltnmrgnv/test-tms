@@ -17,7 +17,7 @@ export default function (sequelize) {
     }
 
     try {
-      await Case.destroy({ where: { id: caseIds } });
+      await Case.update({ isDeleted: true }, { where: { id: caseIds, isDeleted: false } });
       res.status(204).send();
     } catch (error) {
       console.error(error);

@@ -26,7 +26,7 @@ export default function (sequelize) {
 
     try {
       const caseRecords = await Case.findAll({
-        where: { id: caseIds },
+        where: { id: caseIds, isDeleted: false },
         include: [{ model: Step, through: { attributes: ['stepNo'] } }],
       });
 

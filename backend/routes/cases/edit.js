@@ -14,7 +14,7 @@ export default function (sequelize) {
     const caseId = req.params.caseId;
     const updateCase = req.body;
     try {
-      const testcase = await Case.findByPk(caseId);
+      const testcase = await Case.findOne({ where: { id: caseId, isDeleted: false } });
       if (!testcase) {
         return res.status(404).send('Case not found');
       }

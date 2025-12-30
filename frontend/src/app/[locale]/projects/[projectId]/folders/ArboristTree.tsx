@@ -42,6 +42,9 @@ interface Props {
   filter?: FilterOptions;
   onFilterCount?: (count: number) => void;
   updatedCase?: CaseType; // External update from editor
+  onSelectionChange?: (selectedCount: number) => void;
+  triggerBulkDelete?: boolean; // When true, triggers bulk delete of selected items
+  onBulkDeleteComplete?: () => void; // Called after bulk delete completes
 }
 
 export default function ArboristTree({
@@ -53,6 +56,9 @@ export default function ArboristTree({
   filter = {},
   onFilterCount,
   updatedCase,
+  onSelectionChange,
+  triggerBulkDelete,
+  onBulkDeleteComplete,
 }: Props) {
   const ctx = useContext(TokenContext);
   const [treeData, setTreeData] = useState<NodeData[]>([]);
@@ -144,14 +150,14 @@ export default function ArboristTree({
   // Load cases into a folder
   const loadFolder = async (folder: NodeData) => {
     if (folder.loaded) return; // Don't reload if already loaded
-    const subFolders = allFolders.filter((f) => f.parentFolderId === folder.folderId);
+    const subFolders = allFolders.filter((f: FolderType) => f.parentFolderId === folder.folderId);
     const fetchedCases = await fetchCases(ctx.token.access_token, Number(folder.folderId));
 
     // Determine if children should be automatically checked
     const shouldAutoCheck = folder.checked || false;
 
     const children: NodeData[] = [
-      ...subFolders.map((f) => ({
+      ...subFolders.map((f: FolderType) => ({
         id: `folder-${f.id}`,
         name: f.name,
         children: [],
@@ -317,7 +323,7 @@ export default function ArboristTree({
             .filter((n) => n.folderId !== undefined && !folderIds.includes(n.folderId));
 
         setTreeData((prev) => removeNodes(prev));
-        setAllFolders((prev) => prev.filter((f) => !folderIds.includes(f.id)));
+        setAllFolders((prev) => prev.filter((f: FolderType) => !folderIds.includes(f.id)));
 
         addToast({
           title: 'Success',
@@ -414,7 +420,7 @@ export default function ArboristTree({
 
         setTreeData((prev) => updateNode(prev));
         setAllFolders((prev) =>
-          prev.map((f) => (f.id === node.folderId ? { ...f, name: trimmedValue } : f))
+          prev.map((f: FolderType) => (f.id === node.folderId ? { ...f, name: trimmedValue } : f))
         );
       }
     } catch (error) {
@@ -503,9 +509,42 @@ export default function ArboristTree({
     onCaseUpdated?.(updatedCase);
   }, [updatedCase, onCaseUpdated]);
 
+  // Helper function to recursively load all subfolders
+  const loadFolderRecursively = async (folder: NodeData) => {
+    if (folder.loaded) return;
+
+    await loadFolder(folder);
+
+    // After loading, find the updated node in tree and load its subfolders
+    const findAndLoadSubfolders = async (nodes: NodeData[]): Promise<void> => {
+      for (const n of nodes) {
+        if (n.id === folder.id) {
+          // Found the folder, now load all its subfolder children
+          for (const child of n.children) {
+            if (!child.isCase && !child.isCreateNode) {
+              await loadFolderRecursively(child);
+            }
+          }
+          return;
+        }
+        await findAndLoadSubfolders(n.children);
+      }
+    };
+
+    // Wait for state update, then load subfolders
+    setTimeout(async () => {
+      await findAndLoadSubfolders(treeData);
+    }, 0);
+  };
+
   // Checkboxes
   const toggleCheck = async (node: NodeApi<NodeData>) => {
     const newState = !node.data.checked;
+
+    // Auto-load folder and all nested children when checking an unloaded folder
+    if (newState && !node.data.isCase && !node.data.loaded) {
+      await loadFolderRecursively(node.data);
+    }
 
     // Recursively update state of all loaded child nodes
     const updateChildren = (nodes: NodeData[], state: boolean): NodeData[] =>
@@ -556,14 +595,147 @@ export default function ArboristTree({
     setTreeData(prev => updateParents(applyUpdate(prev)));
   };
 
+  // Helper function to count selected items (all)
+  const countSelectedItems = (nodes: NodeData[]): number => {
+    let count = 0;
+    for (const n of nodes) {
+      if (n.checked && !n.isCreateNode) {
+        count++;
+      }
+      count += countSelectedItems(n.children);
+    }
+    return count;
+  };
+
+  // Helper function to count selected cases only (excluding folders)
+  const countSelectedCases = (nodes: NodeData[]): number => {
+    let count = 0;
+    for (const n of nodes) {
+      if (n.checked && n.isCase && !n.isCreateNode) {
+        count++;
+      }
+      count += countSelectedCases(n.children);
+    }
+    return count;
+  };
+
+  // Notify parent of selection changes (only case count)
+  useEffect(() => {
+    const selectedCasesCount = countSelectedCases(treeData);
+    onSelectionChange?.(selectedCasesCount);
+  }, [treeData, onSelectionChange]);
+
+  // Handle bulk delete trigger
+  useEffect(() => {
+    if (!triggerBulkDelete) return;
+
+    const performBulkDelete = async () => {
+      // Collect all checked cases and folders (only top-level checked items)
+      const getCheckedItems = (nodes: NodeData[], parentChecked = false): { cases: NodeData[], folders: NodeData[] } => {
+        let cases: NodeData[] = [];
+        let folders: NodeData[] = [];
+
+        for (const n of nodes) {
+          if (n.isCreateNode) {
+            // Skip create nodes entirely
+            continue;
+          }
+
+          if (!n.checked) {
+            // If node is not checked, still check children (they might be checked individually)
+            const childResult = getCheckedItems(n.children, false);
+            cases = cases.concat(childResult.cases);
+            folders = folders.concat(childResult.folders);
+            continue;
+          }
+
+          // Node is checked
+          if (parentChecked) {
+            // Skip this node if parent is already checked (prevents duplicates)
+            // Parent deletion will cascade to children
+            continue;
+          }
+
+          // Collect this top-level checked item
+          if (n.isCase && n.caseData) {
+            cases.push(n);
+          } else if (n.folderId) {
+            folders.push(n);
+          }
+
+          // Don't process children since this parent is checked
+          // When parent folder is deleted, all children are cascade-deleted
+        }
+
+        return { cases, folders };
+      };
+
+      const { cases: checkedCases, folders: checkedFolders } = getCheckedItems(treeData);
+
+      try {
+        // Handle folder deletion
+        if (checkedFolders.length > 0) {
+          for (const folderNode of checkedFolders) {
+            if (!folderNode.folderId) continue;
+            await deleteFolder(ctx.token.access_token, folderNode.folderId);
+          }
+        }
+
+        // Handle case deletion
+        if (checkedCases.length > 0) {
+          const caseIds = checkedCases.map((c) => c.caseData?.id).filter((id): id is number => id !== undefined);
+          await deleteCases(ctx.token.access_token, caseIds, Number(projectId));
+        }
+
+        // RELOAD tree from server instead of local manipulation
+        // This ensures soft-deleted cases are properly hidden but available for restore
+        const freshFolders = await fetchFolders(ctx.token.access_token, Number(projectId));
+        setAllFolders(freshFolders);
+
+        const roots = freshFolders
+          .filter((f: FolderType) => f.parentFolderId === null)
+          .map((f: FolderType) => ({
+            id: `folder-${f.id}`,
+            name: f.name,
+            folderId: f.id,
+            parentFolderId: null,
+            children: [],
+            loaded: false,
+            checked: false,
+            indeterminate: false,
+            open: false,
+          }));
+        setTreeData(roots);
+
+        const totalDeleted = checkedCases.length + checkedFolders.length;
+        addToast({
+          title: 'Success',
+          color: 'success',
+          description: `Successfully deleted ${totalDeleted} ${totalDeleted === 1 ? 'item' : 'items'}`
+        });
+      } catch (error) {
+        console.error('Error in bulk delete:', error);
+        addToast({
+          title: 'Error',
+          color: 'danger',
+          description: error instanceof Error ? error.message : 'Failed to delete selected items'
+        });
+      }
+
+      onBulkDeleteComplete?.();
+    };
+
+    performBulkDelete();
+  }, [triggerBulkDelete, treeData, ctx, projectId, onBulkDeleteComplete]);
+
   // Helper function to check if a folder is a descendant of another folder
   const isFolderDescendant = (folderId: number, potentialAncestorId: number): boolean => {
-    let currentFolder = allFolders.find((f) => f.id === folderId);
+    let currentFolder = allFolders.find((f: FolderType) => f.id === folderId);
     while (currentFolder) {
       if (currentFolder.parentFolderId === potentialAncestorId) {
         return true;
       }
-      currentFolder = allFolders.find((f) => f.id === currentFolder?.parentFolderId);
+      currentFolder = allFolders.find((f: FolderType) => f.id === currentFolder?.parentFolderId);
     }
     return false;
   };
@@ -717,7 +889,7 @@ export default function ArboristTree({
         for (const folderNode of foldersToMove) {
           if (!folderNode.folderId) continue;
 
-          const folder = allFolders.find((f) => f.id === folderNode.folderId);
+          const folder = allFolders.find((f: FolderType) => f.id === folderNode.folderId);
           if (!folder) continue;
 
           await updateFolder(
@@ -733,7 +905,7 @@ export default function ArboristTree({
         // Update allFolders state
         const folderIds = foldersToMove.map(f => f.folderId).filter((id): id is number => id !== undefined);
         setAllFolders((prev) =>
-          prev.map((f) => (folderIds.includes(f.id) ? { ...f, parentFolderId: targetFolderId } : f))
+          prev.map((f: FolderType) => (folderIds.includes(f.id) ? { ...f, parentFolderId: targetFolderId } : f))
         );
 
         // Remove folders from old location in tree
@@ -766,7 +938,7 @@ export default function ArboristTree({
 
               const createNodeIndex = n.children.findIndex((c) => c.isCreateNode);
               const newFolders: NodeData[] = foldersToMove.map(folderNode => {
-                const folder = allFolders.find(f => f.id === folderNode.folderId);
+                const folder = allFolders.find((f: FolderType) => f.id === folderNode.folderId);
                 return {
                   id: `folder-${folderNode.folderId}`,
                   name: folder?.name || folderNode.name,
@@ -1160,8 +1332,8 @@ export default function ArboristTree({
 
         // First, root folders
         const roots = allFolders
-          .filter((f) => f.parentFolderId === null)
-          .map((f) => ({
+          .filter((f: FolderType) => f.parentFolderId === null)
+          .map((f: FolderType) => ({
             id: `folder-${f.id}`,
             name: f.name,
             folderId: f.id,
@@ -1195,6 +1367,10 @@ export default function ArboristTree({
     }
 
     const loadFilteredTree = async () => {
+      // Always refresh folders before loading filtered tree
+      const freshFolders = await fetchFolders(ctx.token.access_token, Number(projectId));
+      setAllFolders(freshFolders);
+
       const cases: CaseType[] = await searchCases(
         ctx.token.access_token,
         Number(projectId),
@@ -1207,12 +1383,12 @@ export default function ArboristTree({
 
       const folderMap: Record<number, NodeData> = {};
       cases.forEach((c) => {
-        let f = allFolders.find((f) => f.id === c.folderId);
-        if (!f) return;
+        let f = freshFolders.find((f: FolderType) => f.id === c.folderId);
+        if (!f) return; // Skip if folder still not found
         const path: FolderType[] = [];
         while (f) {
           path.unshift(f);
-          f = f.parentFolderId !== null ? allFolders.find((x) => x.id === f?.parentFolderId) : undefined;
+          f = f.parentFolderId !== null ? freshFolders.find((x: FolderType) => x.id === f?.parentFolderId) : undefined;
         }
 
         let parentNode: NodeData | undefined;

@@ -29,6 +29,7 @@ export default function (sequelize) {
     try {
       const whereClause = {
         folderId: folderId,
+        isDeleted: false,
       };
 
       if (search) {
@@ -109,7 +110,7 @@ export default function (sequelize) {
       if (!folderIds.length) return res.json({ count: 0 });
 
       const count = await Case.count({
-        where: { folderId: { [Op.in]: folderIds } },
+        where: { folderId: { [Op.in]: folderIds }, isDeleted: false },
       });
 
       res.json({ count });
@@ -120,7 +121,7 @@ export default function (sequelize) {
   });
 
   router.get('/search', verifySignedIn, verifyProjectVisibleFromProjectId, async (req, res) => {
-    const { projectId, search, priority, type, tag } = req.query;
+    const { projectId, search, priority, type, tag, isDeleted } = req.query;
 
     if (!projectId) {
       return res.status(400).json({ error: 'projectId is required' });
@@ -132,8 +133,17 @@ export default function (sequelize) {
 
       if (!folderIds.length) return res.json([]);
 
+      // Parse isDeleted parameter
+      let isDeletedFilter = false; // default
+      if (isDeleted === 'true') {
+        isDeletedFilter = true;
+      } else if (isDeleted === 'false') {
+        isDeletedFilter = false;
+      }
+
       const whereClause = {
         folderId: { [Op.in]: folderIds },
+        isDeleted: isDeletedFilter,
       };
 
       if (search) {
@@ -214,6 +224,7 @@ export default function (sequelize) {
       const cases = await Case.findAll({
         where: {
           folderId: { [Op.in]: folderIds },
+          isDeleted: false,
         },
         include: [
           {

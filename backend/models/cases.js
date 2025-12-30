@@ -43,14 +43,17 @@ function defineCase(sequelize, DataTypes) {
         model: 'folder',
         key: 'id',
       },
-      onDelete: 'CASCADE',
+    },
+    isDeleted: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
     },
   });
 
   Case.associate = (models) => {
     Case.belongsTo(models.Folder, {
       foreignKey: 'folderId',
-      onDelete: 'CASCADE',
     });
     Case.belongsToMany(models.Step, {
       through: 'caseSteps',

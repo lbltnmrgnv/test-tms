@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect, useContext } from 'react';
-import { addToast } from '@heroui/react';
+import { addToast, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
+import { MoreVertical, Trash2 } from 'lucide-react';
 import { CasesMessages, CaseType } from '@/types/case';
 import { FilterOptions } from '@/types/filter';
 import { LocaleCodeType } from '@/types/locale';
@@ -8,6 +9,7 @@ import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
 import { CaseStatusMessages } from '@/types/status';
 import DeleteConfirmDialog from '@/components/DeleteConfirmDialog';
+import DeletedCasesDialog from '@/components/DeletedCasesDialog';
 import ArboristTree from '@/src/app/[locale]/projects/[projectId]/folders/ArboristTree';
 import AdvancedFilterInput from '@/src/app/[locale]/projects/[projectId]/folders/components/AdvancedFilterInput';
 import { createCase } from '@/utils/caseControl';
@@ -33,7 +35,11 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
   const [currentFolderId, setCurrentFolderId] = useState<number | undefined>(undefined);
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isDeleteConfirmDialogOpen, setIsDeleteConfirmDialogOpen] = useState(false);
+  const [isDeletedCasesDialogOpen, setIsDeletedCasesDialogOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<CaseType | null>(null);
+  const [selectedItemsCount, setSelectedItemsCount] = useState(0);
+  const [isBulkDeleteConfirmDialogOpen, setIsBulkDeleteConfirmDialogOpen] = useState(false);
+  const [triggerBulkDelete, setTriggerBulkDelete] = useState(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [leftWidth, setLeftWidth] = useState<number>(400);
@@ -91,15 +97,31 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
   };
 
   const [updatedCase, setUpdatedCase] = useState<CaseType | undefined>(undefined);
+  const [refreshTreeTrigger, setRefreshTreeTrigger] = useState(0);
 
   const handleCaseUpdated = (updatedCase: CaseType) => {
     if (selectedCase?.id === updatedCase.id) {
       setSelectedCase(updatedCase);
     }
-    // Триггерим обновление дерева
+    // Trigger tree update
     setUpdatedCase(updatedCase);
-    // Сбрасываем через небольшую задержку, чтобы useEffect в ArboristTree сработал
+    // Reset after a small delay so useEffect in ArboristTree triggers
     setTimeout(() => setUpdatedCase(undefined), 0);
+  };
+
+  const handleRestoreSuccess = () => {
+    // Refresh the tree to show restored cases
+    setRefreshTreeTrigger((prev) => prev + 1);
+  };
+
+  const handleBulkDeleteConfirm = () => {
+    setIsBulkDeleteConfirmDialogOpen(false);
+    setTriggerBulkDelete(true);
+  };
+
+  const handleBulkDeleteComplete = () => {
+    setTriggerBulkDelete(false);
+    setRefreshTreeTrigger((prev) => prev + 1);
   };
 
   return (
@@ -129,11 +151,36 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
             />
           </div>
 
-          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)' }}>
-            Test cases: {filteredCount}
+          <div style={{ marginBottom: 8, fontSize: 12, color: 'var(--muted-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Test cases: {filteredCount}</span>
+            <Dropdown>
+              <DropdownTrigger>
+                <Button isIconOnly size="sm" className="bg-transparent rounded-full min-w-0 w-6 h-6">
+                  <MoreVertical size={16} />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Case actions">
+                <DropdownItem
+                  key="delete-selected"
+                  startContent={<Trash2 size={16} />}
+                  onPress={() => setIsBulkDeleteConfirmDialogOpen(true)}
+                  isDisabled={selectedItemsCount === 0}
+                >
+                  Delete selected ({selectedItemsCount})
+                </DropdownItem>
+                <DropdownItem
+                  key="deleted-cases"
+                  startContent={<Trash2 size={16} />}
+                  onPress={() => setIsDeletedCasesDialogOpen(true)}
+                >
+                  Deleted cases
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           </div>
 
           <ArboristTree
+            key={refreshTreeTrigger}
             projectId={projectId}
             messages={messages}
             filter={currentFilter}
@@ -142,6 +189,9 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
             onCaseClick={(caseData: CaseType) => setSelectedCase(caseData)}
             onCaseUpdated={handleCaseUpdated}
             updatedCase={updatedCase}
+            onSelectionChange={setSelectedItemsCount}
+            triggerBulkDelete={triggerBulkDelete}
+            onBulkDeleteComplete={handleBulkDeleteComplete}
           />
         </div>
 
@@ -209,6 +259,22 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
         onConfirm={closeDeleteConfirmDialog}
         closeText={messages.close}
         confirmText={messages.areYouSure}
+        deleteText={messages.delete}
+      />
+
+      <DeletedCasesDialog
+        isOpen={isDeletedCasesDialogOpen}
+        onClose={() => setIsDeletedCasesDialogOpen(false)}
+        projectId={projectId}
+        onRestoreSuccess={handleRestoreSuccess}
+      />
+
+      <DeleteConfirmDialog
+        isOpen={isBulkDeleteConfirmDialogOpen}
+        onCancel={() => setIsBulkDeleteConfirmDialogOpen(false)}
+        onConfirm={handleBulkDeleteConfirm}
+        closeText={messages.close}
+        confirmText={`Are you sure you want to delete ${selectedItemsCount} selected ${selectedItemsCount === 1 ? 'item' : 'items'}?`}
         deleteText={messages.delete}
       />
     </>
