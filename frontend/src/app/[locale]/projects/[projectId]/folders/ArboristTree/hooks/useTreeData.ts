@@ -277,6 +277,52 @@ export const useTreeData = ({
 
         const roots = buildFolderHierarchy(null);
 
+        // Load root-level cases for all root folders
+        const rootFolders = folders.filter((f: FolderType) => f.parentFolderId === null);
+
+        for (const rootFolder of rootFolders) {
+          if (isCancelled) return;
+
+          const rootFolderCases = await fetchCases(
+            ctx.token.access_token,
+            rootFolder.id,
+            filter.search,
+            filter.priorities,
+            filter.types,
+            filter.tags,
+            filter.statuses
+          );
+
+          if (isCancelled) return;
+
+          // Find the corresponding root node and add cases to it
+          const rootNode = roots.find((r) => r.folderId === rootFolder.id);
+          if (rootNode) {
+            rootNode.children = [
+              ...rootNode.children,
+              ...rootFolderCases.map((c: CaseType) => ({
+                id: `case-${c.id}`,
+                name: c.title,
+                isCase: true,
+                caseData: c,
+                folderId: rootFolder.id,
+                children: [],
+                loaded: true,
+                checked: false,
+              })),
+              {
+                id: `create-${rootFolder.id}`,
+                name: 'New Folder',
+                isCreateNode: true,
+                createParentId: rootFolder.id,
+                children: [],
+                loaded: true,
+              },
+            ];
+            rootNode.loaded = true;
+          }
+        }
+
         if (!isCancelled) {
           setTreeData(roots);
         }
