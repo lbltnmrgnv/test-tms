@@ -111,6 +111,7 @@ export default function (sequelize) {
                 ? automationStatus.indexOf(row['automationStatus'])
                 : automationStatus.indexOf('automation-not-required'),
               template: row['template'] ? templates.indexOf(row['template']) : templates.indexOf('text'),
+              createdBy: req.userId,
             });
             stepsToCreate.push({
               caseIndex: casesToCreate.length - 1,

@@ -39,7 +39,7 @@ export default function (sequelize) {
       const clonedCases = cases.map((c) => {
         // eslint-disable-next-line no-unused-vars
         const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...clonedCase } = c;
-        return { ...clonedCase, folderId: targetFolderId };
+        return { ...clonedCase, folderId: targetFolderId, createdBy: req.userId };
       });
 
       await sequelize.transaction(async (t) => {

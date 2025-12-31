@@ -300,7 +300,15 @@
     "search_or_create_tag": "タグを検索または作成",
     "no_tags_selected": "タグが選択されていません",
     "no_steps_yet": "まだステップがありません",
-    "add_step": "ステップを追加"
+    "add_step": "ステップを追加",
+    "owner": "オーナー",
+    "author": "作成者",
+    "assigned_to": "担当者",
+    "assign": "割り当て",
+    "no_owner": "オーナーなし",
+    "no_author": "作成者なし",
+    "no_assignee": "未割り当て",
+    "created_at": "作成日時"
   },
   "Runs": {
     "run_list": "テストラン一覧",

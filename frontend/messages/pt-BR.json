@@ -300,7 +300,15 @@
     "search_or_create_tag": "Buscar ou criar tag",
     "no_tags_selected": "Nenhuma tag selecionada",
     "no_steps_yet": "Ainda não há passos",
-    "add_step": "Adicionar passo"
+    "add_step": "Adicionar passo",
+    "owner": "Proprietário",
+    "author": "Autor",
+    "assigned_to": "Atribuído a",
+    "assign": "Atribuir",
+    "no_owner": "Sem proprietário",
+    "no_author": "Sem autor",
+    "no_assignee": "Não atribuído",
+    "created_at": "Criado"
   },
   "Runs": {
     "run_list": "Lista de Execuções de Teste",

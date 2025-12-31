@@ -58,6 +58,14 @@ export default function Page({
     noTagsSelected: t('no_tags_selected'),
     noStepsYet: t('no_steps_yet'),
     addStep: t('add_step'),
+    owner: t('owner'),
+    assignedTo: t('assigned_to'),
+    noOwner: t('no_owner'),
+    noAssignee: t('no_assignee'),
+    createdAt: t('created_at'),
+    author: t('author'),
+    assign: t('assign'),
+    noAuthor: t('no_author'),
   };
 
   const tt = useTranslations('Type');

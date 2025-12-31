@@ -34,7 +34,7 @@ export default function (sequelize) {
         });
       }
 
-      const { title, state, priority, type, automationStatus, description, template, preConditions, expectedResults } =
+      const { title, state, priority, type, automationStatus, description, template, preConditions, expectedResults, assignedTo } =
         req.body;
 
       const newCase = await Case.create({
@@ -48,6 +48,8 @@ export default function (sequelize) {
         preConditions,
         expectedResults,
         folderId,
+        createdBy: req.userId,
+        assignedTo: assignedTo || null,
       });
 
       res.json(newCase);

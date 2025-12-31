@@ -10,6 +10,9 @@ type CaseType = {
   preConditions: string;
   expectedResults: string;
   folderId: number;
+  createdAt?: string;
+  createdBy?: number;
+  assignedTo?: number;
   Steps?: StepType[];
   RunCases?: RunCaseType[];
   Attachments?: AttachmentType[];
@@ -17,6 +20,18 @@ type CaseType = {
     id: number;
     name: string;
   }[];
+  Creator?: {
+    id: number;
+    username: string;
+    email: string;
+    avatarPath?: string;
+  };
+  Assignee?: {
+    id: number;
+    username: string;
+    email: string;
+    avatarPath?: string;
+  };
 };
 
 type CaseStepType = {
@@ -156,6 +171,14 @@ type CaseMessages = {
   noTagsSelected: string;
   noStepsYet: string;
   addStep: string;
+  owner: string;
+  assignedTo: string;
+  noOwner: string;
+  noAssignee: string;
+  author: string;
+  assign: string;
+  noAuthor: string;
+  createdAt: string;
 };
 
 export type { CaseType, StepType, AttachmentType, CasesMessages, CaseMessages };

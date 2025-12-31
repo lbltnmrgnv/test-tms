@@ -5,6 +5,7 @@ import defineCase from '../../models/cases.js';
 import defineStep from '../../models/steps.js';
 import defineTag from '../../models/tags.js';
 import defineAttachment from '../../models/attachments.js';
+import defineUser from '../../models/users.js';
 import authMiddleware from '../../middleware/auth.js';
 import visibilityMiddleware from '../../middleware/verifyVisible.js';
 
@@ -13,12 +14,15 @@ export default function (sequelize) {
   const Step = defineStep(sequelize, DataTypes);
   const Tags = defineTag(sequelize, DataTypes);
   const Attachment = defineAttachment(sequelize, DataTypes);
+  const User = defineUser(sequelize, DataTypes);
   Case.belongsToMany(Step, { through: 'caseSteps' });
   Step.belongsToMany(Case, { through: 'caseSteps' });
   Case.belongsToMany(Attachment, { through: 'caseAttachments' });
   Attachment.belongsToMany(Case, { through: 'caseAttachments' });
   Case.belongsToMany(Tags, { through: 'caseTags', foreignKey: 'caseId', otherKey: 'tagId' });
   Tags.belongsToMany(Case, { through: 'caseTags', foreignKey: 'tagId', otherKey: 'caseId' });
+  Case.belongsTo(User, { foreignKey: 'createdBy', as: 'Creator' });
+  Case.belongsTo(User, { foreignKey: 'assignedTo', as: 'Assignee' });
   const { verifySignedIn } = authMiddleware(sequelize);
   const { verifyProjectVisibleFromCaseId } = visibilityMiddleware(sequelize);
 
@@ -44,6 +48,16 @@ export default function (sequelize) {
             model: Tags,
             attributes: ['id', 'name'],
             through: { attributes: [] },
+          },
+          {
+            model: User,
+            as: 'Creator',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+          {
+            model: User,
+            as: 'Assignee',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
           },
         ],
       });

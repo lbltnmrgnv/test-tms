@@ -14,7 +14,9 @@ export const isFilterEmpty = (filter: FilterOptions): boolean => {
     (!filter.priorities || filter.priorities.length === 0) &&
     (!filter.types || filter.types.length === 0) &&
     (!filter.tags || filter.tags.length === 0) &&
-    (!filter.statuses || filter.statuses.length === 0)
+    (!filter.statuses || filter.statuses.length === 0) &&
+    (!filter.authors || filter.authors.length === 0) &&
+    (!filter.assignees || filter.assignees.length === 0)
   );
 };
 

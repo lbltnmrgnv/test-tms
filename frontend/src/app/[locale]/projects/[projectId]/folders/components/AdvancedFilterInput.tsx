@@ -4,11 +4,14 @@ import { Circle, X, Search } from 'lucide-react';
 import { FilterOptions, FilterChip, FilterType } from '@/types/filter';
 import { priorities, testTypes, caseStatus } from '@/config/selection';
 import { fetchTags } from '@/utils/tagsControls';
+import { fetchProjectMembers } from '@/src/app/[locale]/projects/[projectId]/members/membersControl';
 import { TokenContext } from '@/utils/TokenProvider';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
 import { CaseStatusMessages } from '@/types/status';
 import { TagType } from '@/types/tag';
+import { MemberType } from '@/types/user';
+import UserAvatar from '@/components/UserAvatar';
 
 type Tag = Pick<TagType, 'id' | 'name'>;
 
@@ -37,18 +40,23 @@ export default function AdvancedFilterInput({
   const [isMainDropdownOpen, setIsMainDropdownOpen] = useState(false);
   const [activeFilterType, setActiveFilterType] = useState<FilterType | null>(null);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [members, setMembers] = useState<MemberType[]>([]);
   const [tagSearchInput, setTagSearchInput] = useState('');
+  const [memberSearchInput, setMemberSearchInput] = useState('');
   const [editingChipId, setEditingChipId] = useState<string | null>(null);
   const [incompleteChip, setIncompleteChip] = useState<FilterType | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Load tags
+  // Load tags and members
   useEffect(() => {
-    const loadTags = async () => {
+    const loadData = async () => {
       const tagsData = await fetchTags(context.token.access_token, projectId);
       setTags(tagsData || []);
+
+      const membersData = await fetchProjectMembers(context.token.access_token, projectId);
+      setMembers(membersData || []);
     };
-    loadTags();
+    loadData();
   }, [projectId, context.token.access_token]);
 
   // Handle key presses
@@ -137,6 +145,16 @@ export default function AdvancedFilterInput({
       filters.statuses = statusChips.map((c) => c.value as number);
     }
 
+    const authorChips = currentChips.filter((c) => c.type === 'author');
+    if (authorChips.length > 0) {
+      filters.authors = authorChips.map((c) => c.value as number);
+    }
+
+    const assigneeChips = currentChips.filter((c) => c.type === 'assignee');
+    if (assigneeChips.length > 0) {
+      filters.assignees = assigneeChips.map((c) => c.value as number);
+    }
+
     onChange(filters);
   };
 
@@ -200,6 +218,18 @@ export default function AdvancedFilterInput({
           className="filter-dropdown-button"
         >
           Tags
+        </button>
+        <button
+          onClick={() => handleFilterTypeClick('author')}
+          className="filter-dropdown-button"
+        >
+          Author
+        </button>
+        <button
+          onClick={() => handleFilterTypeClick('assignee')}
+          className="filter-dropdown-button"
+        >
+          Assignee
         </button>
       </div>
     );
@@ -307,6 +337,98 @@ export default function AdvancedFilterInput({
         );
       }
 
+      case 'author': {
+        const filteredMembers = members.filter((member) =>
+          member.User.username.toLowerCase().includes(memberSearchInput.toLowerCase())
+        );
+
+        return (
+          <div className="filter-dropdown-secondary">
+            <div style={{ padding: 8 }}>
+              <input
+                type="text"
+                value={memberSearchInput}
+                onChange={(e) => setMemberSearchInput(e.target.value)}
+                placeholder="Search authors..."
+                autoFocus
+                className="filter-tag-search-input"
+              />
+              <div style={{ maxHeight: 250, overflowY: 'auto' }}>
+                {filteredMembers.length === 0 ? (
+                  <div style={{ padding: '8px 12px', opacity: 0.6, fontSize: 14 }}>
+                    No members found
+                  </div>
+                ) : (
+                  filteredMembers.map((member) => (
+                    <button
+                      key={member.User.id}
+                      onClick={() => {
+                        addChip('author', `Author|${member.User.username}`, member.User.id as number);
+                        setMemberSearchInput('');
+                      }}
+                      className="filter-dropdown-button-flex"
+                    >
+                      <UserAvatar
+                        size={24}
+                        username={member.User.username}
+                        avatarPath={member.User.avatarPath}
+                      />
+                      <span>{member.User.username}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      case 'assignee': {
+        const filteredMembers = members.filter((member) =>
+          member.User.username.toLowerCase().includes(memberSearchInput.toLowerCase())
+        );
+
+        return (
+          <div className="filter-dropdown-secondary">
+            <div style={{ padding: 8 }}>
+              <input
+                type="text"
+                value={memberSearchInput}
+                onChange={(e) => setMemberSearchInput(e.target.value)}
+                placeholder="Search assignees..."
+                autoFocus
+                className="filter-tag-search-input"
+              />
+              <div style={{ maxHeight: 250, overflowY: 'auto' }}>
+                {filteredMembers.length === 0 ? (
+                  <div style={{ padding: '8px 12px', opacity: 0.6, fontSize: 14 }}>
+                    No members found
+                  </div>
+                ) : (
+                  filteredMembers.map((member) => (
+                    <button
+                      key={member.User.id}
+                      onClick={() => {
+                        addChip('assignee', `Assignee|${member.User.username}`, member.User.id as number);
+                        setMemberSearchInput('');
+                      }}
+                      className="filter-dropdown-button-flex"
+                    >
+                      <UserAvatar
+                        size={24}
+                        username={member.User.username}
+                        avatarPath={member.User.avatarPath}
+                      />
+                      <span>{member.User.username}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -323,6 +445,7 @@ export default function AdvancedFilterInput({
             setActiveFilterType(null);
             setIncompleteChip(null);
             setTagSearchInput('');
+            setMemberSearchInput('');
           }}
         />
       )}
@@ -393,6 +516,8 @@ export default function AdvancedFilterInput({
                 {incompleteChip === 'type' && 'Type'}
                 {incompleteChip === 'status' && 'Status'}
                 {incompleteChip === 'tag' && 'Tag'}
+                {incompleteChip === 'author' && 'Author'}
+                {incompleteChip === 'assignee' && 'Assignee'}
               </span>
               <div className="filter-chip-divider" />
               <span style={{ padding: '0 8px', opacity: 0.5 }}>

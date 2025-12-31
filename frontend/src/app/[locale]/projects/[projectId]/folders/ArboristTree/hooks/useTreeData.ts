@@ -58,7 +58,9 @@ export const useTreeData = ({
       filter.priorities,
       filter.types,
       filter.tags,
-      filter.statuses
+      filter.statuses,
+      filter.authors,
+      filter.assignees
     );
 
     const shouldAutoCheck = folder.checked || false;
@@ -290,7 +292,9 @@ export const useTreeData = ({
             filter.priorities,
             filter.types,
             filter.tags,
-            filter.statuses
+            filter.statuses,
+            filter.authors,
+            filter.assignees
           );
 
           if (isCancelled) return;
@@ -348,7 +352,9 @@ export const useTreeData = ({
         filter.priorities,
         filter.types,
         filter.tags,
-        filter.statuses
+        filter.statuses,
+        filter.authors,
+        filter.assignees
       );
 
       if (isCancelled) return;

@@ -4,6 +4,7 @@ const router = express.Router();
 import { DataTypes, Op } from 'sequelize';
 import defineCase from '../../models/cases.js';
 import defineTag from '../../models/tags.js';
+import defineUser from '../../models/users.js';
 
 import authMiddleware from '../../middleware/auth.js';
 import visibilityMiddleware from '../../middleware/verifyVisible.js';
@@ -15,12 +16,15 @@ export default function (sequelize) {
   const Case = defineCase(sequelize, DataTypes);
   const Folder = defineFolder(sequelize, DataTypes);
   const Tags = defineTag(sequelize, DataTypes);
+  const User = defineUser(sequelize, DataTypes);
 
   Case.belongsToMany(Tags, { through: 'caseTags', foreignKey: 'caseId', otherKey: 'tagId' });
   Tags.belongsToMany(Case, { through: 'caseTags', foreignKey: 'tagId', otherKey: 'caseId' });
+  Case.belongsTo(User, { foreignKey: 'createdBy', as: 'Creator' });
+  Case.belongsTo(User, { foreignKey: 'assignedTo', as: 'Assignee' });
 
   router.get('/', verifySignedIn, verifyProjectVisibleFromFolderId, async (req, res) => {
-    const { folderId, search, priority, type, tag, statuses } = req.query;
+    const { folderId, search, priority, type, tag, statuses, authors, assignees } = req.query;
 
     if (!folderId) {
       return res.status(400).json({ error: 'folderId is required' });
@@ -77,6 +81,26 @@ export default function (sequelize) {
         }
       }
 
+      if (authors) {
+        const authorValues = authors
+          .split(',')
+          .map((a) => parseInt(a.trim(), 10))
+          .filter((a) => !isNaN(a));
+        if (authorValues.length > 0) {
+          whereClause.createdBy = { [Op.in]: authorValues };
+        }
+      }
+
+      if (assignees) {
+        const assigneeValues = assignees
+          .split(',')
+          .map((a) => parseInt(a.trim(), 10))
+          .filter((a) => !isNaN(a));
+        if (assigneeValues.length > 0) {
+          whereClause.assignedTo = { [Op.in]: assigneeValues };
+        }
+      }
+
       const tagInclude = {
         model: Tags,
         attributes: ['id', 'name'],
@@ -97,7 +121,19 @@ export default function (sequelize) {
 
       const cases = await Case.findAll({
         where: whereClause,
-        include: [tagInclude],
+        include: [
+          tagInclude,
+          {
+            model: User,
+            as: 'Creator',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+          {
+            model: User,
+            as: 'Assignee',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+        ],
       });
 
       res.json(cases);
@@ -132,7 +168,7 @@ export default function (sequelize) {
   });
 
   router.get('/search', verifySignedIn, verifyProjectVisibleFromProjectId, async (req, res) => {
-    const { projectId, search, priority, type, tag, isDeleted, statuses } = req.query;
+    const { projectId, search, priority, type, tag, isDeleted, statuses, authors, assignees } = req.query;
 
     if (!projectId) {
       return res.status(400).json({ error: 'projectId is required' });
@@ -182,6 +218,16 @@ export default function (sequelize) {
         if (values.length) whereClause.state = { [Op.in]: values };
       }
 
+      if (authors) {
+        const values = authors.split(',').map(Number).filter(Number.isFinite);
+        if (values.length) whereClause.createdBy = { [Op.in]: values };
+      }
+
+      if (assignees) {
+        const values = assignees.split(',').map(Number).filter(Number.isFinite);
+        if (values.length) whereClause.assignedTo = { [Op.in]: values };
+      }
+
       const tagInclude = {
         model: Tags,
         attributes: ['id', 'name'],
@@ -198,7 +244,19 @@ export default function (sequelize) {
 
       const cases = await Case.findAll({
         where: whereClause,
-        include: [tagInclude],
+        include: [
+          tagInclude,
+          {
+            model: User,
+            as: 'Creator',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+          {
+            model: User,
+            as: 'Assignee',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+        ],
       });
 
       res.json(cases);
@@ -209,7 +267,7 @@ export default function (sequelize) {
   });
 
   router.get('/recursive', verifySignedIn, verifyProjectVisibleFromFolderId, async (req, res) => {
-    const { folderId } = req.query;
+    const { folderId, authors, assignees } = req.query;
 
     if (!folderId) {
       return res.status(400).json({ error: 'folderId is required' });
@@ -236,17 +294,40 @@ export default function (sequelize) {
       // Collect all folder IDs including the root folder and all descendants
       const folderIds = await collectDescendantFolderIds(parseInt(folderId, 10));
 
+      // Build where clause with filters
+      const whereClause = {
+        folderId: { [Op.in]: folderIds },
+        isDeleted: false,
+      };
+
+      if (authors) {
+        const values = authors.split(',').map(Number).filter(Number.isFinite);
+        if (values.length) whereClause.createdBy = { [Op.in]: values };
+      }
+
+      if (assignees) {
+        const values = assignees.split(',').map(Number).filter(Number.isFinite);
+        if (values.length) whereClause.assignedTo = { [Op.in]: values };
+      }
+
       // Find all cases in these folders
       const cases = await Case.findAll({
-        where: {
-          folderId: { [Op.in]: folderIds },
-          isDeleted: false,
-        },
+        where: whereClause,
         include: [
           {
             model: Tags,
             attributes: ['id', 'name'],
             through: { attributes: [] },
+          },
+          {
+            model: User,
+            as: 'Creator',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
+          },
+          {
+            model: User,
+            as: 'Assignee',
+            attributes: ['id', 'username', 'email', 'avatarPath'],
           },
         ],
       });

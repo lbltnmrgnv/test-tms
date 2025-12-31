@@ -44,6 +44,22 @@ function defineCase(sequelize, DataTypes) {
         key: 'id',
       },
     },
+    createdBy: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
+    assignedTo: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id',
+      },
+    },
     isDeleted: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
@@ -56,6 +72,14 @@ function defineCase(sequelize, DataTypes) {
   Case.associate = (models) => {
     Case.belongsTo(models.Folder, {
       foreignKey: 'folderId',
+    });
+    Case.belongsTo(models.User, {
+      foreignKey: 'createdBy',
+      as: 'Creator',
+    });
+    Case.belongsTo(models.User, {
+      foreignKey: 'assignedTo',
+      as: 'Assignee',
     });
     Case.belongsToMany(models.Step, {
       through: 'caseSteps',

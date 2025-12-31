@@ -300,7 +300,15 @@
     "search_or_create_tag": "Найти или создать тег",
     "no_tags_selected": "Теги не выбраны",
     "no_steps_yet": "Шаги пока отсутствуют",
-    "add_step": "Добавить шаг"
+    "add_step": "Добавить шаг",
+    "owner": "Владелец",
+    "author": "Автор",
+    "assigned_to": "Назначен",
+    "assign": "Назначить",
+    "no_owner": "Нет владельца",
+    "no_author": "Нет автора",
+    "no_assignee": "Не назначен",
+    "created_at": "Создан"
   },
   "Runs": {
     "run_list": "Список тест-ранов",

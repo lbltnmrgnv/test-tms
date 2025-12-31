@@ -1,22 +1,25 @@
 'use client';
 import { useState, useEffect, useContext, ChangeEvent, DragEvent } from 'react';
-import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge, Chip, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
-import { Save, Circle } from 'lucide-react';
+import { Input, Textarea, Select, SelectItem, Button, Divider, addToast, Badge, Chip, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, Avatar } from '@heroui/react';
+import { Save, Circle, Pencil } from 'lucide-react';
 import CaseStepsEditor from './CaseStepsEditor';
 import CaseAttachmentsEditor from './CaseAttachmentsEditor';
 import { updateSteps } from './stepControl';
 import { fetchCreateAttachments, fetchDownloadAttachment, fetchDeleteAttachment } from './attachmentControl';
 import CaseTagsEditor from './CaseTagsEditor';
+import UserAvatar from '@/components/UserAvatar';
 import { CaseType, AttachmentType, CaseMessages, StepType } from '@/types/case';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
 import { CaseStatusMessages } from '@/types/status';
+import { MemberType } from '@/types/user';
 import { priorities, testTypes, templates, caseStatus } from '@/config/selection';
 import { logError } from '@/utils/errorHandler';
 import { fetchCase, updateCase } from '@/utils/caseControl';
 import { updateCaseTags } from '@/utils/caseTagsControls';
 import { useFormGuard } from '@/utils/formGuard';
 import { TokenContext } from '@/utils/TokenProvider';
+import { fetchProjectMembers } from '@/src/app/[locale]/projects/[projectId]/members/membersControl';
 
 const defaultTestCase = {
   id: 0,
@@ -30,11 +33,15 @@ const defaultTestCase = {
   preConditions: '',
   expectedResults: '',
   folderId: 0,
+  createdBy: undefined,
+  assignedTo: undefined,
   Steps: [],
   Attachments: [],
   isIncluded: false,
   runStatus: 0,
   Tags: [],
+  Creator: undefined,
+  Assignee: undefined,
 };
 
 type Props = {
@@ -66,6 +73,7 @@ export default function CaseEditor({
   const [isDirty, setIsDirty] = useState(false);
   const [selectedTags, setSelectedTags] = useState<{ id: number; name: string }[]>([]);
   const [isTitleEditing, setIsTitleEditing] = useState<boolean>(false);
+  const [projectMembers, setProjectMembers] = useState<MemberType[]>([]);
 
   useFormGuard(isDirty, messages.areYouSureLeave);
 
@@ -257,6 +265,31 @@ export default function CaseEditor({
     fetchAndSetCase();
   }, [tokenContext, caseId]);
 
+  useEffect(() => {
+    const fetchMembers = async () => {
+      if (!tokenContext.isSignedIn()) return;
+      try {
+        const members = await fetchProjectMembers(tokenContext.token.access_token, projectId);
+        setProjectMembers(members || []);
+      } catch (error: unknown) {
+        logError('Error fetching project members', error);
+      }
+    };
+    fetchMembers();
+  }, [tokenContext, projectId]);
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  };
+
   return (
     <div
       style={{
@@ -270,43 +303,6 @@ export default function CaseEditor({
       {/* Fixed Header */}
       <div className="border-b-1 dark:border-neutral-700 w-full p-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2 flex-1">
-          <Dropdown>
-            <DropdownTrigger>
-              <Chip
-                color={caseStatus[testCase.state].color as any}
-                variant="flat"
-                size="sm"
-                className="cursor-pointer"
-              >
-                {caseStatusMessages[caseStatus[testCase.state].uid]}
-              </Chip>
-            </DropdownTrigger>
-            <DropdownMenu
-              aria-label="Change status"
-              disallowEmptySelection
-              selectedKeys={[caseStatus[testCase.state].uid]}
-              selectionMode="single"
-              onSelectionChange={(keys) => {
-                if (keys !== 'all') {
-                  const selectedUid = Array.from(keys)[0];
-                  const index = caseStatus.findIndex((status) => status.uid === selectedUid);
-                  if (index !== -1 && index !== testCase.state) {
-                    setTestCase({ ...testCase, state: index });
-                    setIsDirty(true);
-                  }
-                }
-              }}
-            >
-              {caseStatus.map((status) => (
-                <DropdownItem
-                  key={status.uid}
-                  startContent={<Circle size={8} color={status.iconColor} fill={status.iconColor} />}
-                >
-                  {caseStatusMessages[status.uid]}
-                </DropdownItem>
-              ))}
-            </DropdownMenu>
-          </Dropdown>
           <span className="text-sm font-semibold text-neutral-600 dark:text-neutral-400">
             #{testCase.id}
           </span>
@@ -388,116 +384,286 @@ export default function CaseEditor({
         </div>
       </div>
 
-      {/* Scrollable Content */}
+      {/* Two-column layout */}
       <div
-        className="p-5"
         style={{
           flex: 1,
-          overflowY: 'auto',
-          overflowX: 'hidden',
+          display: 'flex',
+          overflow: 'hidden',
+          minHeight: 0,
         }}
       >
-        <h6 className="font-bold">{messages.basic}</h6>
-
-        <Textarea
-          size="sm"
-          variant="bordered"
-          label={messages.description}
-          placeholder={messages.testCaseDescription}
-          value={testCase.description}
-          onValueChange={(changeValue) => {
-            setTestCase({ ...testCase, description: changeValue });
+        {/* Main Content (Left Column) */}
+        <div
+          className="p-5"
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            overflowX: 'hidden',
           }}
-          className="mt-3"
-        />
-
-        <CaseTagsEditor
-          projectId={projectId}
-          selectedTags={selectedTags}
-          onChange={(tags) => {
-            setSelectedTags(tags);
-            setIsDirty(true);
-          }}
-          messages={messages}
-        />
-
-        <div>
-          <Select
+        >
+          <Textarea
             size="sm"
             variant="bordered"
-            selectedKeys={[priorities[testCase.priority].uid]}
-            onSelectionChange={(newSelection) => {
-              if (newSelection !== 'all' && newSelection.size !== 0) {
-                const selectedUid = Array.from(newSelection)[0];
-                const index = priorities.findIndex((priority) => priority.uid === selectedUid);
-                setTestCase({ ...testCase, priority: index });
-                setIsDirty(true);
-              }
+            label={messages.description}
+            placeholder={messages.testCaseDescription}
+            value={testCase.description}
+            onValueChange={(changeValue) => {
+              setTestCase({ ...testCase, description: changeValue });
+              setIsDirty(true);
             }}
-            startContent={
-              <Circle size={8} color={priorities[testCase.priority].color} fill={priorities[testCase.priority].color} />
-            }
-            label={messages.priority}
-            className="mt-3 max-w-xs"
-          >
-            {priorities.map((priority) => (
-              <SelectItem key={priority.uid}>{priorityMessages[priority.uid]}</SelectItem>
-            ))}
-          </Select>
-        </div>
+            minRows={3}
+          />
 
-        <div>
-          <Select
-            size="sm"
-            variant="bordered"
-            selectedKeys={[testTypes[testCase.type].uid]}
-            onSelectionChange={(newSelection) => {
-              if (newSelection !== 'all' && newSelection.size !== 0) {
-                const selectedUid = Array.from(newSelection)[0];
-                const index = testTypes.findIndex((type) => type.uid === selectedUid);
-                setTestCase({ ...testCase, type: index });
-              }
-            }}
-            label={messages.type}
-            className="mt-3 max-w-xs"
-          >
-            {testTypes.map((type) => (
-              <SelectItem key={type.uid}>{testTypeMessages[type.uid]}</SelectItem>
-            ))}
-          </Select>
-        </div>
+          <Divider className="my-6" />
+          <div>
+            <h6 className="font-bold mb-3">{messages.steps}</h6>
+            {testCase.Steps && (
+              <CaseStepsEditor
+                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+                steps={testCase.Steps}
+                onStepUpdate={onStepUpdate}
+                onStepPlus={onPlusClick}
+                onStepDelete={onDeleteClick}
+                messages={messages}
+                onDirtyChange={() => setIsDirty(true)}
+              />
+            )}
+          </div>
 
-        <Divider className="my-6" />
-        <div>
-          <h6 className="font-bold mb-3">{messages.steps}</h6>
-          {testCase.Steps && (
-            <CaseStepsEditor
+          <Divider className="my-6" />
+          <h6 className="font-bold">{messages.attachments}</h6>
+          {testCase.Attachments && (
+            <CaseAttachmentsEditor
               isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
-              steps={testCase.Steps}
-              onStepUpdate={onStepUpdate}
-              onStepPlus={onPlusClick}
-              onStepDelete={onDeleteClick}
+              attachments={testCase.Attachments}
+              onAttachmentDownload={(attachmentId: number, downloadFileName: string) =>
+                fetchDownloadAttachment(attachmentId, downloadFileName)
+              }
+              onAttachmentDelete={onAttachmentDelete}
+              onFilesDrop={handleDrop}
+              onFilesInput={handleInput}
               messages={messages}
-              onDirtyChange={() => setIsDirty(true)}
             />
           )}
         </div>
 
-        <Divider className="my-6" />
-        <h6 className="font-bold">{messages.attachments}</h6>
-        {testCase.Attachments && (
-          <CaseAttachmentsEditor
-            isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
-            attachments={testCase.Attachments}
-            onAttachmentDownload={(attachmentId: number, downloadFileName: string) =>
-              fetchDownloadAttachment(attachmentId, downloadFileName)
-            }
-            onAttachmentDelete={onAttachmentDelete}
-            onFilesDrop={handleDrop}
-            onFilesInput={handleInput}
-            messages={messages}
-          />
-        )}
+        {/* Right Sidebar (Metadata Panel) */}
+        <div
+          className="border-l-1 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900"
+          style={{
+            width: '320px',
+            flexShrink: 0,
+            overflowY: 'auto',
+          }}
+        >
+          <div className="p-4 space-y-4">
+            {/* Created Date */}
+            <div>
+              <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-1">
+                {messages.createdAt}
+              </div>
+              <div className="text-sm text-neutral-800 dark:text-neutral-200">
+                {formatDate(testCase.createdAt)}
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* Assign */}
+            <div>
+              <Select
+                size="sm"
+                variant="bordered"
+                label={messages.assign}
+                placeholder={messages.noAssignee}
+                selectedKeys={testCase.assignedTo ? [String(testCase.assignedTo)] : []}
+                onSelectionChange={(keys) => {
+                  if (keys === 'all') return;
+                  const selectedKey = Array.from(keys)[0];
+                  const assignedTo = selectedKey ? Number(selectedKey) : undefined;
+                  setTestCase({ ...testCase, assignedTo });
+                  setIsDirty(true);
+                }}
+                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+                classNames={{
+                  trigger: "h-12",
+                }}
+                renderValue={(items) => {
+                  return items.map((item) => {
+                    const member = projectMembers.find((m) => String(m.User.id) === item.key);
+                    if (!member) return null;
+                    return (
+                      <div key={item.key} className="flex items-center gap-2">
+                        <UserAvatar
+                          size={24}
+                          username={member.User.username}
+                          avatarPath={member.User.avatarPath}
+                        />
+                        <span>{member.User.username}</span>
+                      </div>
+                    );
+                  });
+                }}
+              >
+                {projectMembers.map((member) => (
+                  <SelectItem
+                    key={String(member.User.id)}
+                    textValue={member.User.username}
+                    startContent={
+                      <UserAvatar
+                        size={24}
+                        username={member.User.username}
+                        avatarPath={member.User.avatarPath}
+                      />
+                    }
+                  >
+                    {member.User.username}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+
+            <Divider />
+
+            {/* Tags */}
+            <div>
+              <div className="flex items-center gap-1 mb-2">
+                <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {messages.tags}
+                </span>
+                {tokenContext.isProjectDeveloper(Number(projectId)) && (
+                  <Pencil size={12} className="text-neutral-400" />
+                )}
+              </div>
+              <CaseTagsEditor
+                projectId={projectId}
+                selectedTags={selectedTags}
+                onChange={(tags) => {
+                  setSelectedTags(tags);
+                  setIsDirty(true);
+                }}
+                messages={messages}
+              />
+            </div>
+
+            <Divider />
+
+            {/* Author */}
+            <div>
+              <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-2 flex items-center gap-2">
+                {messages.author}
+              </div>
+              <div className="flex items-center gap-2 text-sm text-neutral-800 dark:text-neutral-200">
+                {testCase.Creator ? (
+                  <>
+                    <UserAvatar
+                      size={24}
+                      username={testCase.Creator.username}
+                      avatarPath={testCase.Creator.avatarPath}
+                    />
+                    <span>{testCase.Creator.username}</span>
+                  </>
+                ) : (
+                  <span className="text-neutral-500">{messages.noAuthor}</span>
+                )}
+              </div>
+            </div>
+
+            <Divider />
+
+            {/* Status */}
+            <div>
+              <Select
+                size="sm"
+                variant="bordered"
+                label={messages.status}
+                selectedKeys={[caseStatus[testCase.state].uid]}
+                onSelectionChange={(keys) => {
+                  if (keys === 'all') return;
+                  const selectedUid = Array.from(keys)[0];
+                  const index = caseStatus.findIndex((status) => status.uid === selectedUid);
+                  if (index !== -1 && index !== testCase.state) {
+                    setTestCase({ ...testCase, state: index });
+                    setIsDirty(true);
+                  }
+                }}
+                startContent={
+                  <Circle
+                    size={8}
+                    color={caseStatus[testCase.state].iconColor}
+                    fill={caseStatus[testCase.state].iconColor}
+                  />
+                }
+                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+              >
+                {caseStatus.map((status) => (
+                  <SelectItem
+                    key={status.uid}
+                    startContent={<Circle size={8} color={status.iconColor} fill={status.iconColor} />}
+                  >
+                    {caseStatusMessages[status.uid]}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+
+            <Divider />
+
+            {/* Priority */}
+            <div>
+              <Select
+                size="sm"
+                variant="bordered"
+                label={messages.priority}
+                selectedKeys={[priorities[testCase.priority].uid]}
+                onSelectionChange={(keys) => {
+                  if (keys === 'all') return;
+                  const selectedUid = Array.from(keys)[0];
+                  const index = priorities.findIndex((priority) => priority.uid === selectedUid);
+                  setTestCase({ ...testCase, priority: index });
+                  setIsDirty(true);
+                }}
+                startContent={
+                  <Circle
+                    size={8}
+                    color={priorities[testCase.priority].color}
+                    fill={priorities[testCase.priority].color}
+                  />
+                }
+                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+              >
+                {priorities.map((priority) => (
+                  <SelectItem key={priority.uid}>{priorityMessages[priority.uid]}</SelectItem>
+                ))}
+              </Select>
+            </div>
+
+            <Divider />
+
+            {/* Type */}
+            <div>
+              <Select
+                size="sm"
+                variant="bordered"
+                label={messages.type}
+                selectedKeys={[testTypes[testCase.type].uid]}
+                onSelectionChange={(keys) => {
+                  if (keys === 'all') return;
+                  const selectedUid = Array.from(keys)[0];
+                  const index = testTypes.findIndex((type) => type.uid === selectedUid);
+                  setTestCase({ ...testCase, type: index });
+                  setIsDirty(true);
+                }}
+                isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
+              >
+                {testTypes.map((type) => (
+                  <SelectItem key={type.uid}>{testTypeMessages[type.uid]}</SelectItem>
+                ))}
+              </Select>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
