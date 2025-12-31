@@ -258,34 +258,28 @@ export const useTreeData = ({
           setAllFolders(folders);
         }
 
-        const roots = folders
-          .filter((f: FolderType) => f.parentFolderId === null)
-          .map((f: FolderType) => ({
-            id: `folder-${f.id}`,
-            name: f.name,
-            folderId: f.id,
-            parentFolderId: null,
-            children: [],
-            loaded: false,
-            checked: false,
-            indeterminate: false,
-            open: false,
-          }));
-
-        if (isCancelled) return;
-        setTreeData(roots);
-
-        const loadCasesRecursively = async (nodes: NodeData[]) => {
-          for (const node of nodes) {
-            if (isCancelled) return;
-            if (node.folderId) {
-              await loadFolder(node);
-              if (node.children.length) await loadCasesRecursively(node.children);
-            }
-          }
+        // Build folder hierarchy recursively without loading cases
+        const buildFolderHierarchy = (parentId: number | null): NodeData[] => {
+          return folders
+            .filter((f: FolderType) => f.parentFolderId === parentId)
+            .map((f: FolderType) => ({
+              id: `folder-${f.id}`,
+              name: f.name,
+              folderId: f.id,
+              parentFolderId: f.parentFolderId,
+              children: buildFolderHierarchy(f.id),
+              loaded: false, // Mark as not loaded - cases will be fetched on click
+              checked: false,
+              indeterminate: false,
+              open: false,
+            }));
         };
 
-        await loadCasesRecursively(roots);
+        const roots = buildFolderHierarchy(null);
+
+        if (!isCancelled) {
+          setTreeData(roots);
+        }
         isInitialLoad.current = false;
       };
 

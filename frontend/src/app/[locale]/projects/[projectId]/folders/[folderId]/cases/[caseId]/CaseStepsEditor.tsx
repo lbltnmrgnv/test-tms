@@ -223,7 +223,7 @@ export default function StepsEditor({
 
     return (
       <div key={step.id} className={indentClass}>
-        <div className="flex items-center gap-2 py-1 group hover:bg-neutral-50 dark:hover:bg-neutral-800/30 rounded-md px-1">
+        <div className="flex items-center gap-2 py-0.5 group hover:bg-neutral-50 dark:hover:bg-neutral-800/30 rounded-md px-1">
           {/* Drag Handle */}
           <div className="flex items-center text-neutral-400 dark:text-neutral-600 cursor-move opacity-0 group-hover:opacity-100 transition-opacity">
             <GripVertical size={16} />
@@ -279,9 +279,9 @@ export default function StepsEditor({
   };
 
   return (
-    <div className="space-y-0.5">
+    <div className="space-y-0">
       {/* Scenario Title */}
-      <h6 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3">
+      <h6 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-2">
         Scenario
       </h6>
 
@@ -328,7 +328,7 @@ export default function StepsEditor({
       )}
 
       {/* Add Step Button at the bottom */}
-      <div className="flex items-center gap-2 mt-3 pt-3">
+      <div className="flex items-center gap-2 mt-2 pt-2">
         <Button
           startContent={<Plus size={14} />}
           size="sm"
