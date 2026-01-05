@@ -4,6 +4,7 @@ import CasesPane from './[folderId]/cases/CasesPane';
 import { PriorityMessages } from '@/types/priority';
 import { TestTypeMessages } from '@/types/testType';
 import { CaseStatusMessages } from '@/types/status';
+import { CaseMessages } from '@/types/case';
 import { LocaleCodeType } from '@/types/locale';
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: LocaleCodeType } }) {
@@ -95,6 +96,60 @@ export default function Page({ params }: { params: { projectId: string; folderId
     deprecated: caseStatusTranslation('deprecated'),
   };
 
+  const tc = useTranslations('Case');
+  const caseMessages: CaseMessages = {
+    backToCases: tc('back_to_cases'),
+    updating: tc('updating'),
+    update: tc('update'),
+    updatedTestCase: tc('updated_test_case'),
+    basic: tc('basic'),
+    title: tc('title'),
+    pleaseEnterTitle: tc('please_enter_title'),
+    description: tc('description'),
+    testCaseDescription: tc('test_case_description'),
+    status: tc('status'),
+    priority: tc('priority'),
+    type: tc('type'),
+    template: tc('template'),
+    testDetail: tc('test_detail'),
+    preconditions: tc('preconditions'),
+    expectedResult: tc('expected_result'),
+    step: tc('step'),
+    text: tc('text'),
+    steps: tc('steps'),
+    newStep: tc('new_step'),
+    detailsOfTheStep: tc('details_of_the_step'),
+    deleteThisStep: tc('delete_this_step'),
+    insertStep: tc('insert_step'),
+    attachments: tc('attachments'),
+    delete: tc('delete'),
+    download: tc('download'),
+    deleteFile: tc('delete_file'),
+    clickToUpload: tc('click_to_upload'),
+    orDragAndDrop: tc('or_drag_and_drop'),
+    maxFileSize: tc('max_file_size'),
+    areYouSureLeave: tc('are_you_sure_leave'),
+    tags: tc('tags'),
+    createTag: tc('create_tag'),
+    maxTagsLimit: tc('max_tags_limit'),
+    tagAlreadyExists: tc('tag_already_exists'),
+    tagCreatedAndAdded: tc('tag_created_and_added'),
+    errorCreatingTag: tc('error_creating_tag'),
+    errorUpdatingTestCase: tc('error_updating_test_case'),
+    searchOrCreateTag: tc('search_or_create_tag'),
+    noTagsSelected: tc('no_tags_selected'),
+    noStepsYet: tc('no_steps_yet'),
+    addStep: tc('add_step'),
+    owner: tc('owner'),
+    assignedTo: tc('assigned_to'),
+    noOwner: tc('no_owner'),
+    noAssignee: tc('no_assignee'),
+    author: tc('author'),
+    assign: tc('assign'),
+    noAuthor: tc('no_author'),
+    createdAt: tc('created_at'),
+  };
+
   return (
     <>
       <CasesPane
@@ -105,6 +160,7 @@ export default function Page({ params }: { params: { projectId: string; folderId
         priorityMessages={priorityMessages}
         testTypeMessages={testTypeMessages}
         caseStatusMessages={caseStatusMessages}
+        caseMessages={caseMessages}
       />
     </>
   );

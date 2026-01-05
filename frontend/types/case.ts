@@ -11,8 +11,8 @@ type CaseType = {
   expectedResults: string;
   folderId: number;
   createdAt?: string;
-  createdBy?: number;
-  assignedTo?: number;
+  createdBy?: number | null;
+  assignedTo?: number | null;
   Steps?: StepType[];
   RunCases?: RunCaseType[];
   Attachments?: AttachmentType[];

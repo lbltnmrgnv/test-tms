@@ -34,7 +34,7 @@ const defaultTestCase = {
   expectedResults: '',
   folderId: 0,
   createdBy: undefined,
-  assignedTo: undefined,
+  assignedTo: null,
   Steps: [],
   Attachments: [],
   isIncluded: false,
@@ -450,7 +450,7 @@ export default function CaseEditor({
 
         {/* Right Sidebar (Metadata Panel) */}
         <div
-          className="border-l-1 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900"
+          className="border-l-1 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-800"
           style={{
             width: '320px',
             flexShrink: 0,
@@ -470,25 +470,27 @@ export default function CaseEditor({
 
             <Divider />
 
-            {/* Assign */}
+            {/* Assignee */}
             <div>
+              <div className="flex items-center gap-1 mb-2">
+                <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {messages.assign}
+                </span>
+              </div>
               <Select
                 size="sm"
                 variant="bordered"
-                label={messages.assign}
                 placeholder={messages.noAssignee}
-                selectedKeys={testCase.assignedTo ? [String(testCase.assignedTo)] : []}
+                selectedKeys={testCase.assignedTo !== null && testCase.assignedTo !== undefined ? [String(testCase.assignedTo)] : []}
+                disallowEmptySelection={false}
                 onSelectionChange={(keys) => {
                   if (keys === 'all') return;
                   const selectedKey = Array.from(keys)[0];
-                  const assignedTo = selectedKey ? Number(selectedKey) : undefined;
+                  const assignedTo = selectedKey ? Number(selectedKey) : null;
                   setTestCase({ ...testCase, assignedTo });
                   setIsDirty(true);
                 }}
                 isDisabled={!tokenContext.isProjectDeveloper(Number(projectId))}
-                classNames={{
-                  trigger: "h-12",
-                }}
                 renderValue={(items) => {
                   return items.map((item) => {
                     const member = projectMembers.find((m) => String(m.User.id) === item.key);
@@ -551,8 +553,10 @@ export default function CaseEditor({
 
             {/* Author */}
             <div>
-              <div className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-2 flex items-center gap-2">
-                {messages.author}
+              <div className="flex items-center gap-1 mb-2">
+                <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400">
+                  {messages.author}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm text-neutral-800 dark:text-neutral-200">
                 {testCase.Creator ? (

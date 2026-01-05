@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect, useContext, useCallback } from 'react';
 import { addToast, Button, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem } from '@heroui/react';
 import { MoreVertical, Trash2 } from 'lucide-react';
-import { CasesMessages, CaseType } from '@/types/case';
+import { CasesMessages, CaseType, CaseMessages } from '@/types/case';
 import { FilterOptions } from '@/types/filter';
 import { LocaleCodeType } from '@/types/locale';
 import { PriorityMessages } from '@/types/priority';
@@ -22,13 +22,14 @@ type Props = {
   projectId: string;
   folderId: string;
   messages: CasesMessages;
+  caseMessages?: CaseMessages;
   priorityMessages?: PriorityMessages;
   testTypeMessages?: TestTypeMessages;
   caseStatusMessages?: CaseStatusMessages;
   locale: LocaleCodeType;
 };
 
-export default function CasesPane({ projectId, messages, priorityMessages, testTypeMessages, caseStatusMessages }: Props) {
+export default function CasesPane({ projectId, messages, caseMessages, priorityMessages, testTypeMessages, caseStatusMessages }: Props) {
   const context = useContext(TokenContext);
 
   const [isCaseDialogOpen, setIsCaseDialogOpen] = useState(false);
@@ -221,7 +222,7 @@ export default function CasesPane({ projectId, messages, priorityMessages, testT
               projectId={projectId}
               folderId={String(selectedCase.folderId ?? '')}
               caseId={String(selectedCase.id)}
-              messages={messages as any}
+              messages={caseMessages || (messages as any)}
               testTypeMessages={testTypeMessages ?? ({} as any)}
               priorityMessages={priorityMessages ?? ({} as any)}
               caseStatusMessages={caseStatusMessages ?? ({} as any)}
