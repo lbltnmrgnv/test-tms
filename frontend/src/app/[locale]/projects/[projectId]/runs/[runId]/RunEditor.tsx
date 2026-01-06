@@ -8,7 +8,6 @@ import {
   SelectItem,
   Tooltip,
   Divider,
-  Selection,
   DropdownTrigger,
   Dropdown,
   DropdownMenu,
@@ -27,11 +26,8 @@ import {
   FileSpreadsheet,
   FileCode,
   FileJson,
-  ChevronRight,
-  Folder,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { NodeApi, Tree } from 'react-arborist';
 import {
   fetchRun,
   updateRun,
@@ -41,22 +37,18 @@ import {
   changeStatus,
   exportRun,
 } from '../runsControl';
-import { fetchFolders } from '../../folders/foldersControl';
 import RunProgressChart from './RunPregressDonutChart';
-import TestCaseSelector from './TestCaseSelector';
+import ArboristTree from '../../folders/ArboristTree';
 import { useRouter } from '@/src/i18n/routing';
 import { testRunStatus } from '@/config/selection';
 import { RunType, RunStatusCountType, RunMessages } from '@/types/run';
 import { CaseType } from '@/types/case';
-import { TreeNodeData } from '@/types/folder';
 import { TokenContext } from '@/utils/TokenProvider';
 import { useFormGuard } from '@/utils/formGuard';
 import { PriorityMessages } from '@/types/priority';
 import { RunStatusMessages, TestRunCaseStatusMessages } from '@/types/status';
 import { TestTypeMessages } from '@/types/testType';
 import { logError } from '@/utils/errorHandler';
-import TreeItem from '@/components/TreeItem';
-import { buildFolderTree } from '@/utils/buildFolderTree';
 
 const defaultTestRun = {
   id: 0,
@@ -93,12 +85,10 @@ export default function RunEditor({
   const tokenContext = useContext(TokenContext);
   const { theme } = useTheme();
   const [testRun, setTestRun] = useState<RunType>(defaultTestRun);
-  const [treeData, setTreeData] = useState<TreeNodeData[]>([]);
   const [runStatusCounts, setRunStatusCounts] = useState<RunStatusCountType[]>([]);
-  const [selectedKeys, setSelectedKeys] = useState<Selection>(new Set([]));
-  const [selectedFolder, setSelectedFolder] = useState<TreeNodeData | null>(null);
   const [testCases, setTestCases] = useState<CaseType[]>([]);
-  const [filteredTestCases, setFilteredTestCases] = useState<CaseType[]>([]);
+  const [selectedCaseId, setSelectedCaseId] = useState<number | undefined>(undefined);
+  const [selectedCount, setSelectedCount] = useState<number>(0);
   const [isNameInvalid] = useState<boolean>(false);
   const [isUpdating, setIsUpdating] = useState<boolean>(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -129,10 +119,6 @@ export default function RunEditor({
 
       try {
         await fetchRunAndStatusCount();
-        const foldersData = await fetchFolders(tokenContext.token.access_token, Number(projectId));
-        const tree = buildFolderTree(foldersData);
-        setTreeData(tree);
-        setSelectedFolder(foldersData[0]);
         initTestCases();
       } catch (error: unknown) {
         logError('Error fetching run data', error);
@@ -143,46 +129,26 @@ export default function RunEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tokenContext]);
 
-  useEffect(() => {
-    function onFilter() {
-      if (selectedFolder && selectedFolder.id) {
-        try {
-          const filteredData = testCases.filter((testCase) => testCase.folderId.toString() === selectedFolder.id);
-          setFilteredTestCases(filteredData);
-        } catch (error: unknown) {
-          logError('Error filtering test cases', error);
-        }
-      }
-    }
-
-    onFilter();
-  }, [selectedFolder, testCases]);
-
-  const handleChangeStatus = async (changeCaseId: number, newStatus: number) => {
-    setIsDirty(true);
-    const newTestCases = changeStatus(changeCaseId, newStatus, testCases);
-    setTestCases(newTestCases);
+  // Handle case click from ArboristTree
+  const handleCaseClick = (caseData: CaseType) => {
+    setSelectedCaseId(caseData.id);
   };
 
-  const handleIncludeExcludeCase = async (isInclude: boolean, clickedTestCaseId: number) => {
-    setIsDirty(true);
-    const keys = [clickedTestCaseId];
-    const newTestCases = includeExcludeTestCases(isInclude, keys, Number(runId), testCases);
-    setTestCases(newTestCases);
+  // Handle selection change from ArboristTree
+  const handleSelectionChange = (count: number) => {
+    setSelectedCount(count);
   };
 
+  // Handle bulk include/exclude based on tree selection
   const handleBulkIncludeExcludeCases = async (isInclude: boolean) => {
+    // This will be handled through ArboristTree's selection
+    // For now, we'll show a placeholder
     setIsDirty(true);
-    let keys: number[] = [];
-    if (selectedKeys === 'all') {
-      keys = filteredTestCases.map((item) => item.id);
-    } else {
-      keys = Array.from(selectedKeys).map(Number);
-    }
-
-    const newTestCases = includeExcludeTestCases(isInclude, keys, Number(runId), testCases);
-    setTestCases(newTestCases);
-    setSelectedKeys(new Set([]));
+    addToast({
+      title: 'Info',
+      color: 'primary',
+      description: isInclude ? 'Include functionality to be implemented' : 'Exclude functionality to be implemented',
+    });
   };
 
   const onSave = async () => {
@@ -348,7 +314,7 @@ export default function RunEditor({
         <div className="flex items-center justify-between">
           <h6 className="h-8 font-bold">{messages.selectTestCase}</h6>
           <div>
-            {(selectedKeys === 'all' || selectedKeys.size > 0) && (
+            {selectedCount > 0 && (
               <Dropdown>
                 <DropdownTrigger>
                   <Button
@@ -357,7 +323,7 @@ export default function RunEditor({
                     color="primary"
                     endContent={<ChevronDown size={16} />}
                   >
-                    {messages.testCaseSelection}
+                    {messages.testCaseSelection} ({selectedCount})
                   </Button>
                 </DropdownTrigger>
                 <DropdownMenu aria-label="test case select actions">
@@ -381,67 +347,53 @@ export default function RunEditor({
           </div>
         </div>
 
-        <div className="mt-3 flex rounded-small border-2 dark:border-neutral-700 mb-12">
-          <div className="w-3/12 border-r-1 dark:border-neutral-700">
-            <Tree
-              data={treeData}
-              className="w-full"
-              indent={16}
-              rowHeight={42}
-              overscanCount={5}
-              paddingTop={20}
-              paddingBottom={20}
-              padding={20}
-              width="100%"
-              openByDefault={false}
-              disableDrop={true}
-              disableDrag={true}
-            >
-              {({ node, style }: { node: NodeApi<TreeNodeData>; style: React.CSSProperties }) => (
-                <TreeItem
-                  style={style}
-                  isSelected={selectedFolder ? node.data.id === selectedFolder.id : false}
-                  onClick={() => {
-                    setSelectedKeys(new Set([]));
-                    setSelectedFolder(node.data);
-                  }}
-                  toggleButton={
-                    node.data.children && node.data.children.length > 0 ? (
-                      <Button
-                        size="sm"
-                        className="bg-transparent rounded-full h-6 w-6 min-w-4"
-                        isIconOnly
-                        onPress={() => node.toggle()}
-                      >
-                        {node.isOpen ? (
-                          <ChevronDown size={20} color="#F7C24E" />
-                        ) : (
-                          <ChevronRight size={20} color="#F7C24E" />
-                        )}
-                      </Button>
-                    ) : null
-                  }
-                  icon={<Folder size={20} color="#F7C24E" fill="#F7C24E" />}
-                  label={node.data.name}
-                />
-              )}
-            </Tree>
-          </div>
-          <div className="w-9/12">
-            <TestCaseSelector
-              cases={filteredTestCases}
-              isDisabled={!tokenContext.isProjectReporter(Number(projectId))}
-              selectedKeys={selectedKeys}
-              onSelectionChange={setSelectedKeys}
-              onChangeStatus={handleChangeStatus}
-              onIncludeCase={(includeTestId) => handleIncludeExcludeCase(true, includeTestId)}
-              onExcludeCase={(excludeCaseId) => handleIncludeExcludeCase(false, excludeCaseId)}
-              messages={messages}
-              testRunCaseStatusMessages={testRunCaseStatusMessages}
-              priorityMessages={priorityMessages}
-              testTypeMessages={testTypeMessages}
-            />
-          </div>
+        <div className="mt-3 rounded-small border-2 dark:border-neutral-700 mb-12" style={{ height: '600px' }}>
+          <ArboristTree
+            projectId={projectId}
+            messages={{
+              ...messages,
+              // Additional messages required by ArboristTree/CasesMessages
+              testCaseList: messages.selectTestCase,
+              newTestCase: '',
+              deleteCase: messages.close,
+              areYouSure: '',
+              delete: messages.close,
+              export: messages.export,
+              noCasesFound: messages.noCasesFound,
+              caseTitle: messages.title,
+              caseDescription: messages.description,
+              caseTitleOrDescription: '',
+              create: '',
+              filter: '',
+              clearAll: '',
+              apply: '',
+              selectPriorities: '',
+              selected: '',
+              selectTypes: '',
+              casesSelected: '',
+              selectAction: '',
+              move: '',
+              clone: '',
+              casesMoved: '',
+              tags: '',
+              casesCloned: '',
+              selectTags: '',
+              import: '',
+              importCases: '',
+              importAvailable: '',
+              downloadTemplate: '',
+              clickToUpload: '',
+              orDragAndDrop: '',
+              maxFileSize: '',
+              casesImported: '',
+              createMore: '',
+              selectCaseTitle: '',
+              selectCaseDescription: '',
+            }}
+            selectedCaseId={selectedCaseId}
+            onCaseClick={handleCaseClick}
+            onSelectionChange={handleSelectionChange}
+          />
         </div>
       </div>
     </>
